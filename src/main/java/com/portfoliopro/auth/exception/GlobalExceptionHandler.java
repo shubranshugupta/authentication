@@ -6,6 +6,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AccountStatusException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -26,7 +27,6 @@ public class GlobalExceptionHandler {
                     HttpStatusCode.valueOf(404),
                     e.getMessage());
             error.setProperty("description", "User not found");
-
         }
 
         if (e instanceof BadCredentialsException) {
@@ -62,6 +62,13 @@ public class GlobalExceptionHandler {
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
             error.setProperty("description", "JWT token has expired");
+        }
+
+        if (e instanceof HttpRequestMethodNotSupportedException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(405),
+                    e.getMessage());
+            error.setProperty("description", "Method not allowed");
         }
 
         if (e == null) {
