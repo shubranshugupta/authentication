@@ -26,8 +26,6 @@ import lombok.RequiredArgsConstructor;
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
-    // TODO: Implement exception handling
-    // private final HandlerExceptionResolver resolver;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -42,30 +40,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        try {
-            final String token = authHeader.substring(7);
-            final String email = jwtService.extractEmail(token);
-            final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        final String token = authHeader.substring(7);
+        final String email = jwtService.extractEmail(token);
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
-            if (email != null && auth == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                if (jwtService.isTokenValid(token, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities());
+        if (email != null && auth == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            if (jwtService.isTokenValid(token, userDetails)) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities());
 
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
             }
-
-            filterChain.doFilter(request, response);
-        } catch (Exception e) {
-            // resolver.resolveException(request, response, null, e);
-            System.out.println(request.toString() + "\n" + response.toString() + "\n" + e.toString());
         }
+
+        filterChain.doFilter(request, response);
 
     }
 
