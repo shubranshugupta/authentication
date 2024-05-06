@@ -1,11 +1,13 @@
 package com.portfoliopro.auth.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AccountStatusException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -21,6 +23,21 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleException(Exception e) {
         ProblemDetail error = null;
         e.printStackTrace();
+
+        // todo: handle this using msg not exception
+        if (e instanceof DataIntegrityViolationException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(400),
+                    e.getMessage());
+            error.setProperty("description", "User already exists");
+        }
+
+        if (e instanceof HttpMediaTypeNotSupportedException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(415),
+                    e.getMessage());
+            error.setProperty("description", "Unsupported media type");
+        }
 
         if (e instanceof UsernameNotFoundException) {
             error = ProblemDetail.forStatusAndDetail(
