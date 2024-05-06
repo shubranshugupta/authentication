@@ -24,7 +24,7 @@ public class GlobalExceptionHandler {
         ProblemDetail error = null;
         e.printStackTrace();
 
-        // todo: handle this using msg not exception
+        // todo: handle all the error in chain of responsibility manager
         if (e instanceof DataIntegrityViolationException) {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(400),
