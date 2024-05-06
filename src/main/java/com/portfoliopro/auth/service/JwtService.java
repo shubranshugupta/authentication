@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+import org.springframework.beans.factory.annotation.Value;
 // import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -19,11 +20,11 @@ import io.jsonwebtoken.security.Keys;
 @Service
 @SuppressWarnings({ "deprecation" })
 public class JwtService {
-    // TODO: Change this to use a secret key from the environment
-    private static String SECRET_KEY = "d5579bf7a834d54c889b60f5ba005c2551505c20128897997612e0c61a84e4b3";
+    @Value("${jwt.token.secret-key}")
+    private String SECRET_KEY;
 
-    // TODO: Change this to use an expire time from the environment
-    private static long expireTime = 3600000;
+    @Value("${jwt.token.expiration}")
+    private long expireTime;
 
     public String extractEmail(String token) {
         return extractClaim(token, Claims::getSubject);

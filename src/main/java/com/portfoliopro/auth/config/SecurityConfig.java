@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
+    private final JwtConfigProperties jwtConfigProperties;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -46,10 +47,9 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // TODO: Change this to the actual domain
-        config.setAllowedOrigins(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setAllowedOrigins(jwtConfigProperties.getCors().getAllowedOrigin());
+        config.setAllowedMethods(jwtConfigProperties.getCors().getAllowedMethods());
+        config.setAllowedHeaders(jwtConfigProperties.getCors().getAllowedHeaders());
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
