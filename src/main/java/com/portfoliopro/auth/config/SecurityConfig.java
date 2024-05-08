@@ -1,5 +1,6 @@
 package com.portfoliopro.auth.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -11,7 +12,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
+import com.portfoliopro.auth.exception.DelegatedAuthenticationEntryPoint;
 import com.portfoliopro.auth.filter.JwtAuthFilter;
 
 import lombok.RequiredArgsConstructor;
@@ -23,12 +24,16 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
     private final JwtConfigProperties jwtConfigProperties;
+    @Qualifier("delegatedAuthenticationEntryPoint")
+    private final DelegatedAuthenticationEntryPoint authEntryPoint;
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf
                 .disable())
                 .authorizeHttpRequests(requests -> requests
+                        .requestMatchers("/auth/hello")
+                        .authenticated()
                         .requestMatchers("/auth/**")
                         .permitAll()
                         .anyRequest()
@@ -36,7 +41,8 @@ public class SecurityConfig {
                 .sessionManagement(management -> management
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(handling -> handling.authenticationEntryPoint(authEntryPoint));
 
         return http.build();
     }
