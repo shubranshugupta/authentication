@@ -33,6 +33,8 @@ public class AuthController {
         return ResponseEntity.ok(authService.loginUser(request));
     }
 
+    // todo: add logout endpoint
+
     @GetMapping("/hello")
     public ResponseEntity<String> hello() {
         return ResponseEntity.ok("Hello World");
