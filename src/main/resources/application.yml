@@ -21,7 +21,7 @@ jwt:
     token:
         # todo: make it encrypted
         secret-key: "d5579bf7a834d54c889b60f5ba005c2551505c20128897997612e0c61a84e4b3"
-        expiration: 3600000
+        expiration: 28800000
     
     cors:
         allowed-origins:
