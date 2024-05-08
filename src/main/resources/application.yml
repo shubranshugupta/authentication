@@ -16,6 +16,9 @@ spring:
 
 server:
     port: 8080
+    servlet:
+        session:
+            timeout: 30s
 
 jwt:
     token:
