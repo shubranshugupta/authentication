@@ -1,4 +1,4 @@
-package com.portfoliopro.auth.exception;
+package com.portfoliopro.auth.exception.handler;
 
 // import org.springframework.beans.factory.annotation.Autowired;
 // import org.springframework.beans.factory.annotation.Qualifier;
