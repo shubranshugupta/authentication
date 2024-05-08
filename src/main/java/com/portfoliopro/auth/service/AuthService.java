@@ -1,7 +1,10 @@
 package com.portfoliopro.auth.service;
 
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +15,10 @@ import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.repository.UserRepository;
 
+// import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.io.DecodingException;
+import io.jsonwebtoken.security.InvalidKeyException;
+import io.jsonwebtoken.security.WeakKeyException;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -40,12 +47,13 @@ public class AuthService {
     }
 
     public AuthResponse loginUser(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException(request.getEmail() + " user not found"));
+
         manager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getEmail(),
                         request.getPassword()));
-
-        User user = userRepository.findByEmail(request.getEmail()).orElseThrow();
 
         String token = jwtService.generateToken(user);
         return AuthResponse.builder()
