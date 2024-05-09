@@ -1,4 +1,4 @@
-package com.portfoliopro.auth.config;
+package com.portfoliopro.auth.config.properties;
 
 import java.util.List;
 
