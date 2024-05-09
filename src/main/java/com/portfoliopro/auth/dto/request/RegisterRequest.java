@@ -1,4 +1,4 @@
-package com.portfoliopro.auth.dto;
+package com.portfoliopro.auth.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

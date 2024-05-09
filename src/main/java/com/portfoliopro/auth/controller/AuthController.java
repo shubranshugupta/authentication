@@ -2,9 +2,9 @@ package com.portfoliopro.auth.controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
-import com.portfoliopro.auth.dto.AuthResponse;
-import com.portfoliopro.auth.dto.LoginRequest;
-import com.portfoliopro.auth.dto.RegisterRequest;
+import com.portfoliopro.auth.dto.response.AuthResponse;
+import com.portfoliopro.auth.dto.request.LoginRequest;
+import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.service.AuthService;
 
 import lombok.RequiredArgsConstructor;

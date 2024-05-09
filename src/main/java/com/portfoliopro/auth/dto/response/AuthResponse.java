@@ -1,4 +1,4 @@
-package com.portfoliopro.auth.dto;
+package com.portfoliopro.auth.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class LoginRequest {
-    String email;
-    String password;
-
+public class AuthResponse {
+    private String token;
 }

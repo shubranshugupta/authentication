@@ -6,9 +6,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.portfoliopro.auth.dto.AuthResponse;
-import com.portfoliopro.auth.dto.LoginRequest;
-import com.portfoliopro.auth.dto.RegisterRequest;
+import com.portfoliopro.auth.dto.response.AuthResponse;
+import com.portfoliopro.auth.dto.request.LoginRequest;
+import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.repository.UserRepository;
