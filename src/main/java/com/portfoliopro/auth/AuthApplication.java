@@ -6,7 +6,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class AuthApplication {
 	// todo: add cache functionality to reduce the number of database calls
-	// todo: add session management functionality
 	public static void main(String[] args) {
 		SpringApplication.run(AuthApplication.class, args);
 	}

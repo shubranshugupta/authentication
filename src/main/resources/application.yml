@@ -1,11 +1,14 @@
 spring:
     application:
         name: auth
+    
+    config:
+        import: file:src\main\resources\env.properties
 
     datasource:
-        url: jdbc:mysql://localhost:3306/portfoliopro
-        username: root
-        password: Arbs24022001@
+        url: jdbc:mysql://localhost:3306/${DB_DATABASE}
+        username: ${DB_USER}
+        password: ${DB_PASSWORD}
         driver-class-name: com.mysql.cj.jdbc.Driver
 
     jpa:
@@ -16,14 +19,11 @@ spring:
 
 server:
     port: 8080
-    servlet:
-        session:
-            timeout: 30s
 
 jwt:
     token:
         # todo: make it encrypted
-        secret-key: "d5579bf7a834d54c889b60f5ba005c2551505c20128897997612e0c61a84e4b3"
+        secret-key: ${JWT_SECRET_KEY}
         expiration: 28800000
     
     cors:
