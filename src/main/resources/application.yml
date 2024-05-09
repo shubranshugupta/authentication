@@ -22,7 +22,6 @@ server:
 
 jwt:
     token:
-        # todo: make it encrypted
         secret-key: ${JWT_SECRET_KEY}
         expiration: 28800000
     
