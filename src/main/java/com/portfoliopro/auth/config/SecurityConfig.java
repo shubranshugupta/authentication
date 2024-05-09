@@ -12,7 +12,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import com.portfoliopro.auth.exception.DelegatedAuthenticationEntryPoint;
+import com.portfoliopro.auth.exception.handler.DelegatedAuthenticationEntryPoint;
+import com.portfoliopro.auth.config.properties.JwtConfigProperties;
 import com.portfoliopro.auth.filter.JwtAuthFilter;
 
 import lombok.RequiredArgsConstructor;
