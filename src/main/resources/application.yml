@@ -23,8 +23,7 @@ server:
 jwt:
     token:
         secret-key: ${JWT_SECRET_KEY}
-        expiration: 120000
-        refresh-expiration: 300000
+        expiration: 28800000
     
     cors:
         allowed-origins:
