@@ -7,6 +7,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AccountStatusException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.transaction.TransactionSystemException;
 
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
 
@@ -60,6 +61,13 @@ public class UserExceptionHandler implements AuthExceptionHandler {
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
             error.setProperty("msg", "User is not authorized to access this resource");
+        }
+
+        if (e instanceof TransactionSystemException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(400),
+                    e.getMessage());
+            error.setProperty("msg", "Invalid input");
         }
 
         if (nextHandler == null && error == null) {
