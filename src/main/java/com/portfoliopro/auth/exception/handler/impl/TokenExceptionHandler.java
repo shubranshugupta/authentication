@@ -4,6 +4,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 
+import com.portfoliopro.auth.exception.ExpireRefreshTokenException;
+import com.portfoliopro.auth.exception.InvalidRefreshTokenException;
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
 
 import io.jsonwebtoken.ExpiredJwtException;
@@ -25,7 +27,7 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
         ProblemDetail error = null;
         // e.printStackTrace();
 
-        if(e instanceof InsufficientAuthenticationException) {
+        if (e instanceof InsufficientAuthenticationException) {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(401),
                     e.getMessage());
@@ -44,6 +46,20 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
             error.setProperty("msg", "JWT token has expired");
+        }
+
+        if (e instanceof ExpireRefreshTokenException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "Refresh token has expired");
+        }
+
+        if (e instanceof InvalidRefreshTokenException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "Invalid refresh token");
         }
 
         if (nextHandler == null && error == null) {

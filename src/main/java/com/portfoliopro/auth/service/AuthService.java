@@ -8,9 +8,11 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
+import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
+import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ public class AuthService {
         private final UserRepository userRepository;
         private final PasswordEncoder passwordEncoder;
         private final JwtService jwtService;
+        private final RefereshTokenService refereshTokenService;
         private final AuthenticationManager manager;
 
         public AuthResponse registerUser(RegisterRequest request) {
@@ -34,9 +37,12 @@ public class AuthService {
 
                 userRepository.save(user);
 
-                String token = jwtService.generateToken(user);
+                String accessToken = jwtService.generateToken(user);
+                String refreshToken = refereshTokenService.createRefereshToken(request.getEmail())
+                                .getRefreshToken();
                 return AuthResponse.builder()
-                                .token(token)
+                                .accessToken(accessToken)
+                                .refreshToken(refreshToken)
                                 .build();
         }
 
@@ -50,9 +56,23 @@ public class AuthService {
                                                 request.getEmail(),
                                                 request.getPassword()));
 
-                String token = jwtService.generateToken(user);
+                String accessToken = jwtService.generateToken(user);
+                String refreshToken = refereshTokenService.createRefereshToken(request.getEmail())
+                                .getRefreshToken();
                 return AuthResponse.builder()
-                                .token(token)
+                                .accessToken(accessToken)
+                                .refreshToken(refreshToken)
+                                .build();
+        }
+
+        public AuthResponse verifyRefreshToken(RefreshTokenRequest request) {
+                RefreshToken refToken = refereshTokenService.verifyRefereshToken(request.getRefreshToken());
+                User user = refToken.getUser();
+
+                String accessToken = jwtService.generateToken(user);
+                return AuthResponse.builder()
+                                .accessToken(accessToken)
+                                .refreshToken(request.getRefreshToken())
                                 .build();
         }
 }

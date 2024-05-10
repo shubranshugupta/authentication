@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
+import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.service.AuthService;
 
@@ -32,6 +33,15 @@ public class AuthController {
             @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.loginUser(request));
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refreshToken(
+            @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(authService.verifyRefreshToken(request));
+    }
+
+    // todo: implement reset password
+    // todo: implement update first and last name
 
     @GetMapping("/hello")
     public ResponseEntity<String> hello() {
