@@ -20,6 +20,7 @@ public class JwtConfigProperties {
     public static class JwtTokenConfigProperties {
         private String secretKey;
         private long expiration;
+        private long refreshExpiration;
     }
 
     @Data
