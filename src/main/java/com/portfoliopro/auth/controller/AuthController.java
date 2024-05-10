@@ -3,6 +3,7 @@ package com.portfoliopro.auth.controller;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
+import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
 import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
@@ -40,7 +41,13 @@ public class AuthController {
         return ResponseEntity.ok(authService.verifyRefreshToken(request));
     }
 
-    // todo: implement reset password
+    @PostMapping("/logout")
+    public ResponseEntity<MsgResponse> logoutUser(
+            @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(authService.logoutUser(request));
+    }
+
+    // todo: implement reset password via email
     // todo: implement update first and last name
 
     @GetMapping("/hello")

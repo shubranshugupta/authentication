@@ -54,4 +54,10 @@ public class RefereshTokenService {
 
         return refereshToken;
     }
+
+    public void deleteRefereshToken(String token) {
+        RefreshToken refereshToken = refereshTokenRepository.findByRefreshToken(token)
+                .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token: " + token));
+        refereshTokenRepository.delete(refereshToken);
+    }
 }

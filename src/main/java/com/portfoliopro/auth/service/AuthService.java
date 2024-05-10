@@ -7,6 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
+import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
 import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
@@ -73,6 +74,13 @@ public class AuthService {
                 return AuthResponse.builder()
                                 .accessToken(accessToken)
                                 .refreshToken(request.getRefreshToken())
+                                .build();
+        }
+
+        public MsgResponse logoutUser(RefreshTokenRequest request) {
+                refereshTokenService.deleteRefereshToken(request.getRefreshToken());
+                return MsgResponse.builder()
+                                .msg("Logout successful")
                                 .build();
         }
 }
