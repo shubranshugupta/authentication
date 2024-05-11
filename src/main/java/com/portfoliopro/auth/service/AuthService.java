@@ -12,6 +12,7 @@ import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
+import com.portfoliopro.auth.exception.UserAlreadyExistsException;
 import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 
@@ -27,7 +28,12 @@ public class AuthService {
         private final AuthenticationManager manager;
 
         public AuthResponse registerUser(RegisterRequest request) {
-                User user = User.builder()
+                User user = userRepository.findByEmail(request.getEmail())
+                                .orElse(null);
+                if (user != null)
+                        throw new UserAlreadyExistsException(request.getEmail() + " already exists");
+
+                user = User.builder()
                                 .firstName(request.getFirstName())
                                 .lastName(request.getLastName())
                                 .email(request.getEmail())
