@@ -1,6 +1,5 @@
 package com.portfoliopro.auth.exception.handler.impl;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -9,6 +8,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.transaction.TransactionSystemException;
 
+import com.portfoliopro.auth.exception.UserAlreadyExistsException;
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
 
 import lombok.AllArgsConstructor;
@@ -28,7 +28,7 @@ public class UserExceptionHandler implements AuthExceptionHandler {
         ProblemDetail error = null;
         // e.printStackTrace();
 
-        if (e instanceof DataIntegrityViolationException) {
+        if (e instanceof UserAlreadyExistsException) {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(400),
                     e.getMessage());
