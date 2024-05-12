@@ -21,6 +21,7 @@ public class JwtConfigProperties {
         private String secretKey;
         private long expiration;
         private long refreshExpiration;
+        private long verifyExpiration;
     }
 
     @Data

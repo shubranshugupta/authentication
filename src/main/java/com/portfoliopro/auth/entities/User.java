@@ -63,8 +63,14 @@ public class User implements UserDetails {
     @Column(name = "role", nullable = false)
     private Role role;
 
+    @Column(name = "is_enabled", nullable = false)
+    private boolean isEnabled;
+
     @OneToOne(mappedBy = "user")
     private RefreshToken refreshToken;
+
+    @OneToOne(mappedBy = "user")
+    private VerificationToken verificationToken;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -98,6 +104,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return isEnabled;
     }
 }

@@ -3,18 +3,22 @@ package com.portfoliopro.auth.controller;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
+import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
 import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.service.AuthService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/auth")
@@ -23,9 +27,9 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> registerUser(
-            @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.registerUser(request));
+    public ResponseEntity<MsgResponse> registerUser(
+            @RequestBody RegisterRequest request, final HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(authService.registerUser(request, httpRequest));
     }
 
     @PostMapping("/login")
@@ -38,6 +42,12 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refreshToken(
             @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(authService.verifyRefreshToken(request));
+    }
+
+    @GetMapping("/verifyEmail")
+    public ResponseEntity<MsgResponse> verifyEmail(@Nullable @RequestParam String token, @RequestParam String email,
+            final HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(authService.verifyEmail(token, email, httpRequest));
     }
 
     // todo: implement reset password
