@@ -16,7 +16,6 @@ import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.VerificationToken;
 import com.portfoliopro.auth.event.PasswordResetEvent;
 import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
@@ -93,16 +92,16 @@ public class AuthService {
                                 .build();
         }
 
-        public MsgResponse verifyEmail(String token, String email, HttpServletRequest httpRequest) {
-                if (token == null && email != null) {
-                        User user = userRepository.findByEmail(email)
-                                        .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
+        public MsgResponse verifyEmail(String email, String token, HttpServletRequest httpRequest) {
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
 
-                        if (user.isEnabled())
-                                return MsgResponse.builder()
-                                                .msg("Email already verified")
-                                                .build();
+                if (user.isEnabled())
+                        return MsgResponse.builder()
+                                        .msg("Email already verified")
+                                        .build();
 
+                if (token == null) {
                         String appUrl = "http://" + httpRequest.getServerName() + ":" + httpRequest.getServerPort();
                         eventPublisher.publishEvent(new RegistrationCompletionEvent(user, appUrl));
 
@@ -111,12 +110,9 @@ public class AuthService {
                                         .build();
                 }
 
-                VerificationToken verifyToken = verificationTokenService.verifyToken(token);
-                User user = verifyToken.getUser();
+                verificationTokenService.verifyToken(user, token);
                 user.setEnabled(true);
-
                 userRepository.save(user);
-                verificationTokenService.deleteVerifyToken(verifyToken);
 
                 return MsgResponse.builder()
                                 .msg("Email verified successfully")
@@ -125,10 +121,10 @@ public class AuthService {
 
         public MsgResponse resetPassword(String email, @Nullable ResetPasswordRequest request,
                         HttpServletRequest httpRequest) {
-                if (request == null) {
-                        User user = userRepository.findByEmail(email)
-                                        .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
 
+                if (request == null) {
                         eventPublisher.publishEvent(new PasswordResetEvent(user));
 
                         return MsgResponse.builder()
@@ -136,9 +132,6 @@ public class AuthService {
                                         .build();
 
                 }
-
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
 
                 passwordResetService.verifyOtp(user, request.getOtp());
                 user.setPassword(passwordEncoder.encode(request.getPassword()));

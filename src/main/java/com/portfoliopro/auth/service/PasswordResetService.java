@@ -26,11 +26,15 @@ public class PasswordResetService {
     private static final Random random = new Random();
 
     public Otp createOtp(User user) {
-        if (user.getOtp() != null) {
-            otpRepository.delete(user.getOtp());
-        }
+        Otp otp = user.getOtp();
 
-        Otp otp = Otp.builder()
+        if (otp != null && otp.getExpiryDate().isAfter(Instant.now()))
+            return otp;
+
+        if (otp != null)
+            otpRepository.delete(otp);
+
+        otp = Otp.builder()
                 .user(user)
                 .otp(otpGenerator())
                 .expiryDate(Instant.now().plusMillis(expireTime))

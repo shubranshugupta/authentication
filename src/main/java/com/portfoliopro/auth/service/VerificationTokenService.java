@@ -23,7 +23,15 @@ public class VerificationTokenService {
     private long expireTime;
 
     public VerificationToken createVerifyToken(User user) {
-        VerificationToken verificationToken = VerificationToken.builder()
+        VerificationToken verificationToken = user.getVerificationToken();
+
+        if (verificationToken != null && verificationToken.getExpiryDate().isAfter(Instant.now()))
+            return verificationToken;
+
+        if (verificationToken != null)
+            verificationTokenRepository.delete(verificationToken);
+
+        verificationToken = VerificationToken.builder()
                 .user(user)
                 .verifyToken(UUID.randomUUID().toString())
                 .expiryDate(Instant.now().plusMillis(expireTime))
@@ -34,19 +42,22 @@ public class VerificationTokenService {
         return verificationToken;
     }
 
-    public VerificationToken verifyToken(String token) {
-        VerificationToken verifyToken = verificationTokenRepository.findByVerifyToken(token)
-                .orElseThrow(() -> new InvalidVerificationTokenException("Invalid token: " + token));
+    public boolean verifyToken(User user, String token) {
+        VerificationToken verificationToken = user.getVerificationToken();
 
-        if (verifyToken.getExpiryDate().isBefore(Instant.now())) {
-            verificationTokenRepository.delete(verifyToken);
-            throw new ExpireVerificationTokenException("Token: " + token + " is expired");
+        if (verificationToken == null) {
+            throw new InvalidVerificationTokenException("Verification token not found");
         }
 
-        return verifyToken;
-    }
+        if (verificationToken.getExpiryDate().isBefore(Instant.now())) {
+            verificationTokenRepository.delete(verificationToken);
+            throw new ExpireVerificationTokenException("Verification token expired");
+        }
 
-    public void deleteVerifyToken(VerificationToken token) {
-        verificationTokenRepository.delete(token);
+        if (!verificationToken.getVerifyToken().equals(token)) {
+            throw new InvalidVerificationTokenException("Invalid verification token");
+        }
+
+        return true;
     }
 }

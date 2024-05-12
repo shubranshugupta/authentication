@@ -25,6 +25,9 @@ public class PasswordResetEventListener implements ApplicationListener<PasswordR
     public void onApplicationEvent(@NonNull PasswordResetEvent event) {
         User user = event.getUser();
         Otp otp = passwordResetService.createOtp(user);
+        if (otp.equals(user.getOtp())) {
+            return;
+        }
 
         // todo: move this to a template
         String htmlTemplate = "<p> Hello, " + user.getFirstName() + " " + user.getLastName() + "</p>"

@@ -46,12 +46,11 @@ public class AuthController {
     }
 
     @GetMapping("/verifyEmail")
-    public ResponseEntity<MsgResponse> verifyEmail(@Nullable @RequestParam String token, @RequestParam String email,
+    public ResponseEntity<MsgResponse> verifyEmail(@RequestParam String email, @Nullable @RequestParam String token,
             final HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(authService.verifyEmail(token, email, httpRequest));
+        return ResponseEntity.ok(authService.verifyEmail(email, token, httpRequest));
     }
 
-    // todo: implement reset password
     @PostMapping("/resetPassword")
     public ResponseEntity<MsgResponse> resetPassword(@RequestParam String email,
             @Nullable @RequestBody ResetPasswordRequest request,

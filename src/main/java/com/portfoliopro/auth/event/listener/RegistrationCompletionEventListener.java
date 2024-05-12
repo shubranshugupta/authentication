@@ -24,14 +24,11 @@ public class RegistrationCompletionEventListener implements ApplicationListener<
     @Override
     public void onApplicationEvent(@NonNull RegistrationCompletionEvent event) {
         User user = event.getUser();
-        VerificationToken token = user.getVerificationToken();
-
-        if (token == null) {
-            token = verificationTokenService.createVerifyToken(user);
-        } else {
-            verificationTokenService.deleteVerifyToken(token);
-            token = verificationTokenService.createVerifyToken(user);
+        VerificationToken token = verificationTokenService.createVerifyToken(user);
+        if (token.equals(user.getVerificationToken())) {
+            return;
         }
+
         String appUrl = event.getAppUrl() + "/auth/verifyEmail?token=" + token.getVerifyToken() + "&email="
                 + user.getEmail();
 
