@@ -4,10 +4,13 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 
+import com.portfoliopro.auth.exception.ExpireOtpException;
 import com.portfoliopro.auth.exception.ExpireRefreshTokenException;
 import com.portfoliopro.auth.exception.ExpireVerificationTokenException;
+import com.portfoliopro.auth.exception.InvalidOtpException;
 import com.portfoliopro.auth.exception.InvalidRefreshTokenException;
 import com.portfoliopro.auth.exception.InvalidVerificationTokenException;
+import com.portfoliopro.auth.exception.OtpNotFoundException;
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
 
 import io.jsonwebtoken.ExpiredJwtException;
@@ -76,6 +79,27 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
             error.setProperty("msg", "Invalid verification token");
+        }
+
+        if (e instanceof OtpNotFoundException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "OTP not found");
+        }
+
+        if (e instanceof ExpireOtpException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "OTP expired");
+        }
+
+        if (e instanceof InvalidOtpException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "Invalid OTP");
         }
 
         if (nextHandler == null && error == null) {

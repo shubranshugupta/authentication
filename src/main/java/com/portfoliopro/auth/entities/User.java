@@ -72,6 +72,9 @@ public class User implements UserDetails {
     @OneToOne(mappedBy = "user")
     private VerificationToken verificationToken;
 
+    @OneToOne(mappedBy = "user")
+    private Otp otp;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Arrays.asList(new SimpleGrantedAuthority(role.name()));

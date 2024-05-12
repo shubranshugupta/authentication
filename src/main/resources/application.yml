@@ -39,7 +39,7 @@ auth:
         expiration: 120000
         refresh-expiration: 300000
         verify-expiration: 30000
-        otp-expiration: 300000
+        otp-expiration: 30000
     
     cors:
         allowed-origins:

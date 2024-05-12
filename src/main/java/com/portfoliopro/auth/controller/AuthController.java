@@ -7,6 +7,7 @@ import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
 import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
+import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.service.AuthService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,6 +52,12 @@ public class AuthController {
     }
 
     // todo: implement reset password
+    @PostMapping("/resetPassword")
+    public ResponseEntity<MsgResponse> resetPassword(@RequestParam String email,
+            @Nullable @RequestBody ResetPasswordRequest request,
+            final HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(authService.resetPassword(email, request, httpRequest));
+    }
     // todo: implement update first and last name
 
     @GetMapping("/hello")

@@ -1,6 +1,7 @@
 package com.portfoliopro.auth.service;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -12,9 +13,11 @@ import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
 import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
+import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.entities.VerificationToken;
+import com.portfoliopro.auth.event.PasswordResetEvent;
 import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
 import com.portfoliopro.auth.entities.RefreshToken;
@@ -33,6 +36,7 @@ public class AuthService {
         private final AuthenticationManager manager;
         private final ApplicationEventPublisher eventPublisher;
         private final VerificationTokenService verificationTokenService;
+        private final PasswordResetService passwordResetService;
 
         public MsgResponse registerUser(RegisterRequest request, final HttpServletRequest httpRequest) {
                 User user = userRepository.findByEmail(request.getEmail())
@@ -116,6 +120,31 @@ public class AuthService {
 
                 return MsgResponse.builder()
                                 .msg("Email verified successfully")
+                                .build();
+        }
+
+        public MsgResponse resetPassword(String email, @Nullable ResetPasswordRequest request,
+                        HttpServletRequest httpRequest) {
+                if (request == null) {
+                        User user = userRepository.findByEmail(email)
+                                        .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
+
+                        eventPublisher.publishEvent(new PasswordResetEvent(user));
+
+                        return MsgResponse.builder()
+                                        .msg("Password reset email sent")
+                                        .build();
+
+                }
+
+                User user = userRepository.findByEmail(email)
+                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
+
+                passwordResetService.verifyOtp(user, request.getOtp());
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
+                userRepository.save(user);
+                return MsgResponse.builder()
+                                .msg("Password reset successfully")
                                 .build();
         }
 }
