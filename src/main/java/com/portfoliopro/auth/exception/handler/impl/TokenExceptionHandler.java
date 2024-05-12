@@ -5,7 +5,9 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 
 import com.portfoliopro.auth.exception.ExpireRefreshTokenException;
+import com.portfoliopro.auth.exception.ExpireVerificationTokenException;
 import com.portfoliopro.auth.exception.InvalidRefreshTokenException;
+import com.portfoliopro.auth.exception.InvalidVerificationTokenException;
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
 
 import io.jsonwebtoken.ExpiredJwtException;
@@ -38,14 +40,14 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
-            error.setProperty("msg", "Invalid JWT token signature");
+            error.setProperty("msg", "Invalid Token signature");
         }
 
         if (e instanceof ExpiredJwtException) {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
-            error.setProperty("msg", "JWT token has expired");
+            error.setProperty("msg", "Token has expired");
         }
 
         if (e instanceof ExpireRefreshTokenException) {
@@ -60,6 +62,20 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
             error.setProperty("msg", "Invalid refresh token");
+        }
+
+        if (e instanceof ExpireVerificationTokenException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "Verification token has expired");
+        }
+
+        if (e instanceof InvalidVerificationTokenException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "Invalid verification token");
         }
 
         if (nextHandler == null && error == null) {
