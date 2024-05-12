@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 public class VerificationTokenService {
     private final VerificationTokenRepository verificationTokenRepository;
 
-    @Value("${jwt.token.verify-expiration}")
+    @Value("${auth.token.verify-expiration}")
     private long expireTime;
 
     public VerificationToken createVerifyToken(User user) {

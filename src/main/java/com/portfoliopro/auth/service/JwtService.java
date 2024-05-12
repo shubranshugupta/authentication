@@ -19,10 +19,10 @@ import io.jsonwebtoken.security.Keys;
 @Service
 @SuppressWarnings({ "deprecation" })
 public class JwtService {
-    @Value("${jwt.token.secret-key}")
+    @Value("${auth.token.secret-key}")
     private String SECRET_KEY;
 
-    @Value("${jwt.token.expiration}")
+    @Value("${auth.token.expiration}")
     private long expireTime;
 
     public String extractEmail(String token) {

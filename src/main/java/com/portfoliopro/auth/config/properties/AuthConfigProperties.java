@@ -10,23 +10,24 @@ import lombok.NoArgsConstructor;
 
 @Data
 @Configuration
-@ConfigurationProperties("jwt")
-public class JwtConfigProperties {
-    private JwtTokenConfigProperties token = new JwtTokenConfigProperties();
-    private JwtCorsConfigProperties cors = new JwtCorsConfigProperties();
+@ConfigurationProperties("auth")
+public class AuthConfigProperties {
+    private TokenConfigProperties token = new TokenConfigProperties();
+    private CorsConfigProperties cors = new CorsConfigProperties();
 
     @Data
     @NoArgsConstructor
-    public static class JwtTokenConfigProperties {
+    public static class TokenConfigProperties {
         private String secretKey;
         private long expiration;
         private long refreshExpiration;
         private long verifyExpiration;
+        private long otpExpiration;
     }
 
     @Data
     @NoArgsConstructor
-    public static class JwtCorsConfigProperties {
+    public static class CorsConfigProperties {
         private List<String> allowedOrigin;
         private List<String> allowedMethods;
         private List<String> allowedHeaders;

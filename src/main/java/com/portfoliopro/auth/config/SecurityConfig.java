@@ -14,7 +14,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.portfoliopro.auth.exception.handler.DelegatedAuthenticationEntryPoint;
-import com.portfoliopro.auth.config.properties.JwtConfigProperties;
+import com.portfoliopro.auth.config.properties.AuthConfigProperties;
 import com.portfoliopro.auth.filter.JwtAuthFilter;
 
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
-    private final JwtConfigProperties jwtConfigProperties;
+    private final AuthConfigProperties authConfigProperties;
     @Qualifier("delegatedAuthenticationEntryPoint")
     private final DelegatedAuthenticationEntryPoint authEntryPoint;
 
@@ -54,9 +54,9 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(jwtConfigProperties.getCors().getAllowedOrigin());
-        config.setAllowedMethods(jwtConfigProperties.getCors().getAllowedMethods());
-        config.setAllowedHeaders(jwtConfigProperties.getCors().getAllowedHeaders());
+        config.setAllowedOrigins(authConfigProperties.getCors().getAllowedOrigin());
+        config.setAllowedMethods(authConfigProperties.getCors().getAllowedMethods());
+        config.setAllowedHeaders(authConfigProperties.getCors().getAllowedHeaders());
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

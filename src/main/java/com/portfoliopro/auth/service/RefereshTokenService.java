@@ -22,7 +22,7 @@ public class RefereshTokenService {
     private final RefereshTokenRepository refereshTokenRepository;
     private final UserRepository userRepository;
 
-    @Value("${jwt.token.refresh-expiration}")
+    @Value("${auth.token.refresh-expiration}")
     private long expireTime;
 
     public RefreshToken createRefereshToken(String email) {
