@@ -5,6 +5,7 @@ import java.io.UnsupportedEncodingException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.MailBody;
@@ -23,6 +24,7 @@ public class EmailService {
 
     private static final String SENDER_NAME = "PortfolioPro";
 
+    @Async
     public void sendEmail(MailBody mailBody) throws MessagingException, UnsupportedEncodingException {
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
         MimeMessageHelper msgHelper = new MimeMessageHelper(mimeMessage, true, "UTF-8");

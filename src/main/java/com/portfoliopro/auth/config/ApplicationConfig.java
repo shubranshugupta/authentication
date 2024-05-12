@@ -2,6 +2,8 @@ package com.portfoliopro.auth.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -17,6 +19,7 @@ import com.portfoliopro.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
+@EnableAsync
 @RequiredArgsConstructor
 public class ApplicationConfig {
     private final UserRepository userRepository;
@@ -45,5 +48,16 @@ public class ApplicationConfig {
     @Bean
     AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public ThreadPoolTaskExecutor taskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("Email-");
+        executor.initialize();
+        return executor;
     }
 }
