@@ -3,8 +3,8 @@ package com.portfoliopro.auth.exception.handler.impl;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.AccountStatusException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.transaction.TransactionSystemException;
 
@@ -42,18 +42,18 @@ public class UserExceptionHandler implements AuthExceptionHandler {
             error.setProperty("msg", "User not found");
         }
 
+        if (e instanceof DisabledException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "Account is disabled. Please Verify your Account");
+        }
+
         if (e instanceof BadCredentialsException) {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(401),
                     e.getMessage());
             error.setProperty("msg", "Invalid username or password.");
-        }
-
-        if (e instanceof AccountStatusException) {
-            error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(403),
-                    e.getMessage());
-            error.setProperty("msg", "Account is disabled.");
         }
 
         if (e instanceof AccessDeniedException) {
