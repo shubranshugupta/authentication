@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.Otp;
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.exception.ExpireOtpException;
-import com.portfoliopro.auth.exception.InvalidOtpException;
+import com.portfoliopro.auth.exception.TokenExpireException;
+import com.portfoliopro.auth.exception.InvalidTokenException;
 import com.portfoliopro.auth.exception.OtpNotFoundException;
 import com.portfoliopro.auth.repository.OtpRepository;
 
@@ -54,11 +54,11 @@ public class PasswordResetService {
 
         if (otp.getExpiryDate().isBefore(Instant.now())) {
             otpRepository.delete(otp);
-            throw new ExpireOtpException("OTP expired");
+            throw new TokenExpireException(otp + " OTP expired", new Throwable("OTP expired"));
         }
 
         if (otp.getOtp() != otpRequest) {
-            throw new InvalidOtpException("Invalid OTP");
+            throw new InvalidTokenException(otpRequest + "otp is invalid.", new Throwable("Invalid OTP"));
         }
 
         return true;

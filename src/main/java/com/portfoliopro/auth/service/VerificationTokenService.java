@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.entities.VerificationToken;
-import com.portfoliopro.auth.exception.ExpireVerificationTokenException;
-import com.portfoliopro.auth.exception.InvalidVerificationTokenException;
+import com.portfoliopro.auth.exception.InvalidTokenException;
+import com.portfoliopro.auth.exception.TokenExpireException;
 import com.portfoliopro.auth.repository.VerificationTokenRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -45,17 +45,15 @@ public class VerificationTokenService {
     public boolean verifyToken(User user, String token) {
         VerificationToken verificationToken = user.getVerificationToken();
 
-        if (verificationToken == null) {
-            throw new InvalidVerificationTokenException("Verification token not found");
+        if (verificationToken == null || !verificationToken.getVerifyToken().equals(token)) {
+            throw new InvalidTokenException(token + " verification token is invalid",
+                    new Throwable("Invalid verification token"));
         }
 
         if (verificationToken.getExpiryDate().isBefore(Instant.now())) {
             verificationTokenRepository.delete(verificationToken);
-            throw new ExpireVerificationTokenException("Verification token expired");
-        }
-
-        if (!verificationToken.getVerifyToken().equals(token)) {
-            throw new InvalidVerificationTokenException("Invalid verification token");
+            throw new TokenExpireException(verificationToken + " Verification token is expired",
+                    new Throwable("Verification token is expired"));
         }
 
         return true;

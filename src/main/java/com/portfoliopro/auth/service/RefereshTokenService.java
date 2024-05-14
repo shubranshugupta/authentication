@@ -9,8 +9,8 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.exception.ExpireRefreshTokenException;
-import com.portfoliopro.auth.exception.InvalidRefreshTokenException;
+import com.portfoliopro.auth.exception.InvalidTokenException;
+import com.portfoliopro.auth.exception.TokenExpireException;
 import com.portfoliopro.auth.repository.RefereshTokenRepository;
 import com.portfoliopro.auth.repository.UserRepository;
 
@@ -45,11 +45,13 @@ public class RefereshTokenService {
 
     public RefreshToken verifyRefereshToken(String token) {
         RefreshToken refereshToken = refereshTokenRepository.findByRefreshToken(token)
-                .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token: " + token));
+                .orElseThrow(() -> new InvalidTokenException(token + " is invalid refresh token.",
+                        new Throwable("Invalid refresh token")));
 
         if (refereshToken.getExpiryDate().isBefore(Instant.now())) {
             refereshTokenRepository.delete(refereshToken);
-            throw new ExpireRefreshTokenException("Refresh token: " + token + " is expired");
+            throw new TokenExpireException(refereshToken + " Refresh token is expired",
+                    new Throwable("Refresh token is expired"));
         }
 
         return refereshToken;
