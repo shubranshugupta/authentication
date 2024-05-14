@@ -15,8 +15,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Data
+@Slf4j
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -26,7 +28,6 @@ public class UserExceptionHandler implements AuthExceptionHandler {
     @Override
     public ProblemDetail handle(Exception e) {
         ProblemDetail error = null;
-        // e.printStackTrace();
 
         if (e instanceof UserAlreadyExistsException) {
             error = ProblemDetail.forStatusAndDetail(
@@ -75,6 +76,7 @@ public class UserExceptionHandler implements AuthExceptionHandler {
                     HttpStatusCode.valueOf(500),
                     e.getMessage());
             error.setProperty("msg", "An unexpected error occurred");
+            log.error(e.getMessage(), e);
         }
         if (nextHandler != null && error == null)
             return nextHandler.handle(e);

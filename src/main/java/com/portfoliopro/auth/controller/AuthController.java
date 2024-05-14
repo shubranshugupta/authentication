@@ -57,11 +57,4 @@ public class AuthController {
             final HttpServletRequest httpRequest) {
         return ResponseEntity.ok(authService.resetPassword(email, request, httpRequest));
     }
-    // todo: implement update first and last name
-
-    @GetMapping("/hello")
-    public ResponseEntity<String> hello() {
-        return ResponseEntity.ok("Hello World");
-    }
-
 }

@@ -77,4 +77,7 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
+    public String getEmailFromToken(String token) {
+        return extractEmail(token.substring(7));
+    }
 }
