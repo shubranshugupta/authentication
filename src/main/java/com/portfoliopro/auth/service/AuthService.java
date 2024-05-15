@@ -17,6 +17,7 @@ import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
+import com.portfoliopro.auth.entities.VerificationToken;
 import com.portfoliopro.auth.event.PasswordResetEvent;
 import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
@@ -107,8 +108,25 @@ public class AuthService {
                                         .build();
 
                 if (token == null) {
-                        String appUrl = "http://" + httpRequest.getServerName() + ":" + httpRequest.getServerPort();
-                        eventPublisher.publishEvent(new RegistrationCompletionEvent(user, appUrl));
+                        VerificationToken newToken = verificationTokenService.createVerifyToken(user);
+                        if (newToken.equals(user.getVerificationToken())) {
+                                return MsgResponse.builder()
+                                                .msg("Verification email already sent")
+                                                .build();
+                        }
+
+                        String appUrl = "http://" + httpRequest.getServerName() + ":" + httpRequest.getServerPort()
+                                        + "/auth/verifyEmail?token=" + newToken.getVerifyToken()
+                                        + "&email=" + user.getEmail();
+
+                        TokenEmailDTO tokenEmailDTO = TokenEmailDTO.builder()
+                                        .email(user.getEmail())
+                                        .firstName(user.getFirstName())
+                                        .lastName(user.getLastName())
+                                        .token(appUrl)
+                                        .build();
+
+                        eventPublisher.publishEvent(new RegistrationCompletionEvent(user, tokenEmailDTO));
 
                         return MsgResponse.builder()
                                         .msg("Verification email sent")
@@ -141,7 +159,7 @@ public class AuthService {
                                         .email(user.getEmail())
                                         .firstName(user.getFirstName())
                                         .lastName(user.getLastName())
-                                        .token(otp.getOtp())
+                                        .token(String.valueOf(otp.getOtp()))
                                         .build();
 
                         eventPublisher.publishEvent(new PasswordResetEvent(user, passwordResetDTO));

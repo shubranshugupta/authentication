@@ -42,7 +42,7 @@ auth:
         # todo: change expiration time
         expiration: 120000
         refresh-expiration: 300000
-        verify-expiration: 3000
+        verify-expiration: 30000
         otp-expiration: 30000
     
     cors:

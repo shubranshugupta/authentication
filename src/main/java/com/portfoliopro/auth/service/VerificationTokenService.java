@@ -56,6 +56,7 @@ public class VerificationTokenService {
                     new Throwable("Verification token is expired"));
         }
 
+        verificationTokenRepository.delete(verificationToken);
         return true;
     }
 }

@@ -56,6 +56,7 @@ public class PasswordResetService {
             throw new TokenExpireException(otpRequest + " OTP expired", new Throwable("OTP expired"));
         }
 
+        otpRepository.delete(otp);
         return true;
     }
 

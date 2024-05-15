@@ -26,7 +26,7 @@ public class PasswordResetEventListener implements ApplicationListener<PasswordR
         String email = event.getPasswordResetDTO().getEmail();
         String firstName = event.getPasswordResetDTO().getFirstName();
         String lastName = event.getPasswordResetDTO().getLastName();
-        long otp = event.getPasswordResetDTO().getToken();
+        String otp = event.getPasswordResetDTO().getToken();
 
         Context context = new Context();
         context.setVariable("firstName", StringUtils.capitalize(firstName));

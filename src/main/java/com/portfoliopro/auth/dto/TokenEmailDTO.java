@@ -13,5 +13,5 @@ public class TokenEmailDTO implements Serializable {
     String email;
     String firstName;
     String lastName;
-    long token;
+    String token;
 }
