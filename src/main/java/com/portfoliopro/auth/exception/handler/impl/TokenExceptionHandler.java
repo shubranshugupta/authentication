@@ -5,7 +5,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 
 import com.portfoliopro.auth.exception.InvalidTokenException;
-import com.portfoliopro.auth.exception.OtpNotFoundException;
 import com.portfoliopro.auth.exception.TokenExpireException;
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
 
@@ -54,21 +53,14 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
-            error.setProperty("msg", "Refresh token has expired");
-        }
-
-        if (e instanceof OtpNotFoundException) {
-            error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(403),
-                    e.getMessage());
-            error.setProperty("msg", "OTP not found");
+            error.setProperty("msg", "Token has expired");
         }
 
         if (e instanceof InvalidTokenException) {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
-            error.setProperty("msg", "Invalid OTP");
+            error.setProperty("msg", "Invalid Token");
         }
 
         if (nextHandler == null && error == null) {

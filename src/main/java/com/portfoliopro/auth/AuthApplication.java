@@ -9,8 +9,6 @@ public class AuthApplication {
 	// todo: use proper http code for each exception
 	// todo verification and password reset service are same and can be combined or
 	// refactored
-	// todo: need to solve verification email error
-	// InsufficientAuthenticationException
 	public static void main(String[] args) {
 		SpringApplication.run(AuthApplication.class, args);
 	}

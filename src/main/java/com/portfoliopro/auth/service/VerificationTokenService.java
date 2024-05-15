@@ -52,7 +52,7 @@ public class VerificationTokenService {
 
         if (verificationToken.getExpiryDate().isBefore(Instant.now())) {
             verificationTokenRepository.delete(verificationToken);
-            throw new TokenExpireException(verificationToken + " Verification token is expired",
+            throw new TokenExpireException(token + " Verification token is expired",
                     new Throwable("Verification token is expired"));
         }
 

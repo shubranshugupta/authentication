@@ -4,6 +4,10 @@ spring:
     
     config:
         import: file:src\main\resources\env.properties
+    
+    mvc:
+        view:
+            suffix: .html
 
     datasource:
         url: jdbc:mysql://localhost:3306/${DB_DATABASE}
@@ -38,7 +42,7 @@ auth:
         # todo: change expiration time
         expiration: 120000
         refresh-expiration: 300000
-        verify-expiration: 30000
+        verify-expiration: 3000
         otp-expiration: 30000
     
     cors:

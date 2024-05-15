@@ -50,7 +50,7 @@ public class RefereshTokenService {
 
         if (refereshToken.getExpiryDate().isBefore(Instant.now())) {
             refereshTokenRepository.delete(refereshToken);
-            throw new TokenExpireException(refereshToken + " Refresh token is expired",
+            throw new TokenExpireException(token + " Refresh token is expired",
                     new Throwable("Refresh token is expired"));
         }
 

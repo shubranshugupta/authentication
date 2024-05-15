@@ -10,7 +10,6 @@ import com.portfoliopro.auth.entities.Otp;
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.exception.TokenExpireException;
 import com.portfoliopro.auth.exception.InvalidTokenException;
-import com.portfoliopro.auth.exception.OtpNotFoundException;
 import com.portfoliopro.auth.repository.OtpRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -48,17 +47,13 @@ public class PasswordResetService {
     public boolean verifyOtp(User user, long otpRequest) {
         Otp otp = user.getOtp();
 
-        if (otp == null) {
-            throw new OtpNotFoundException("OTP not found");
+        if (otp == null || otp.getOtp() != otpRequest) {
+            throw new InvalidTokenException(otpRequest + " OTP is inavlid", new Throwable("Invalid OTP"));
         }
 
         if (otp.getExpiryDate().isBefore(Instant.now())) {
             otpRepository.delete(otp);
-            throw new TokenExpireException(otp + " OTP expired", new Throwable("OTP expired"));
-        }
-
-        if (otp.getOtp() != otpRequest) {
-            throw new InvalidTokenException(otpRequest + "otp is invalid.", new Throwable("Invalid OTP"));
+            throw new TokenExpireException(otpRequest + " OTP expired", new Throwable("OTP expired"));
         }
 
         return true;
