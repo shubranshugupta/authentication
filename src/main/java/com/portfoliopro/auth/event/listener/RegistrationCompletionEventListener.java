@@ -3,6 +3,9 @@ package com.portfoliopro.auth.event.listener;
 import org.springframework.context.ApplicationListener;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 import com.portfoliopro.auth.dto.MailBody;
 import com.portfoliopro.auth.entities.User;
@@ -20,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class RegistrationCompletionEventListener implements ApplicationListener<RegistrationCompletionEvent> {
     private final VerificationTokenService verificationTokenService;
     private final EmailService emailService;
+    private final TemplateEngine templateEngine;
 
     @Override
     public void onApplicationEvent(@NonNull RegistrationCompletionEvent event) {
@@ -32,12 +36,15 @@ public class RegistrationCompletionEventListener implements ApplicationListener<
         String appUrl = event.getAppUrl() + "/auth/verifyEmail?token=" + token.getVerifyToken() + "&email="
                 + user.getEmail();
 
-        // todo: move this to a template
-        String htmlTemplate = "<p> Hello, " + user.getFirstName() + " " + user.getLastName() + "</p>"
-                + "<p> Thank you for registering with PortfolioPro. Please click the link below to verify your email address.</p>"
-                + "<a href=\"" + appUrl + "\">Verify Email</a>";
+        Context context = new Context();
+        context.setVariable("firstName", StringUtils.capitalize(user.getFirstName()));
+        context.setVariable("lastName", StringUtils.capitalize(user.getLastName()));
+        context.setVariable("appUrl", appUrl);
 
-        MailBody mailBody = new MailBody(user.getEmail(), "Verify Email", htmlTemplate);
+        String htmlTemplate = templateEngine.process("verify_registration_email", context);
+
+        MailBody mailBody = new MailBody(user.getEmail(), "Verify Email",
+                htmlTemplate);
         try {
             emailService.sendEmail(mailBody);
         } catch (Exception e) {

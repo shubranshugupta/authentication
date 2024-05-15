@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="https://www.thymeleaf.org">
+<head>
+    <title>Password Reset Email</title>
+</head>
+<body>
+    <!-- todo: make it beautiful -->
+    <p> Hello, [[${firstName}]] [[${lastName}]]</p>
+    <p>Thank you for registering with PortfolioPro. Please click the link below to verify your email address.</p>
+    <a th:href="${appUrl}">Verify Email</a>
+</body>
+</html>

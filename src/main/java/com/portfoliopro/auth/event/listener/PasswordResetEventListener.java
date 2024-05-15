@@ -3,6 +3,9 @@ package com.portfoliopro.auth.event.listener;
 import org.springframework.context.ApplicationListener;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 import com.portfoliopro.auth.dto.MailBody;
 import com.portfoliopro.auth.entities.Otp;
@@ -20,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PasswordResetEventListener implements ApplicationListener<PasswordResetEvent> {
     private final PasswordResetService passwordResetService;
     private final EmailService emailService;
+    private final TemplateEngine templateEngine;
 
     @Override
     public void onApplicationEvent(@NonNull PasswordResetEvent event) {
@@ -29,17 +33,19 @@ public class PasswordResetEventListener implements ApplicationListener<PasswordR
             return;
         }
 
-        // todo: move this to a template
-        String htmlTemplate = "<p> Hello, " + user.getFirstName() + " " + user.getLastName() + "</p>"
-                + "<p> You have requested to reset your password. Please use the OTP below to reset your password.</p>"
-                + "<p> OTP: " + otp.getOtp() + "</p>";
+        Context context = new Context();
+        context.setVariable("firstName", StringUtils.capitalize(user.getFirstName()));
+        context.setVariable("lastName", StringUtils.capitalize(user.getLastName()));
+        context.setVariable("otp", otp.getOtp());
 
-        MailBody mailBody = new MailBody(user.getEmail(), "Password Reset", htmlTemplate);
+        String htmlTemplate = templateEngine.process("password_reset_email", context);
+
+        MailBody mailBody = new MailBody(user.getEmail(), "Password Reset",
+                htmlTemplate);
         try {
             emailService.sendEmail(mailBody);
         } catch (Exception e) {
             log.error("Error sending email: " + e.getMessage());
         }
     }
-
 }
