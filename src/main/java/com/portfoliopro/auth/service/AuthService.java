@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
 import com.portfoliopro.auth.dto.response.MsgResponse;
+import com.portfoliopro.auth.dto.TokenEmailDTO;
 import com.portfoliopro.auth.dto.request.LoginRequest;
 import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
@@ -19,6 +20,7 @@ import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.event.PasswordResetEvent;
 import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
+import com.portfoliopro.auth.entities.Otp;
 import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 
@@ -54,12 +56,15 @@ public class AuthService {
 
                 userRepository.save(user);
 
-                String appUrl = "http://" + httpRequest.getServerName() + ":" + httpRequest.getServerPort();
-                eventPublisher.publishEvent(new RegistrationCompletionEvent(user, appUrl));
+                // String appUrl = "http://" + httpRequest.getServerName() + ":" +
+                // httpRequest.getServerPort();
+                // eventPublisher.publishEvent(new RegistrationCompletionEvent(user, appUrl));
 
-                return MsgResponse.builder()
-                                .msg("User registered successfully. Please verify your email.")
-                                .build();
+                // return MsgResponse.builder()
+                // .msg("User registered successfully. Please verify your email.")
+                // .build();
+
+                return verifyEmail(user.getEmail(), null, httpRequest);
         }
 
         public AuthResponse loginUser(LoginRequest request) {
@@ -125,7 +130,21 @@ public class AuthService {
                                 .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
 
                 if (request == null) {
-                        eventPublisher.publishEvent(new PasswordResetEvent(user));
+                        Otp otp = passwordResetService.createOtp(user);
+                        if (otp.equals(user.getOtp())) {
+                                return MsgResponse.builder()
+                                                .msg("Otp already sent")
+                                                .build();
+                        }
+
+                        TokenEmailDTO passwordResetDTO = TokenEmailDTO.builder()
+                                        .email(user.getEmail())
+                                        .firstName(user.getFirstName())
+                                        .lastName(user.getLastName())
+                                        .token(otp.getOtp())
+                                        .build();
+
+                        eventPublisher.publishEvent(new PasswordResetEvent(user, passwordResetDTO));
 
                         return MsgResponse.builder()
                                         .msg("Password reset email sent")

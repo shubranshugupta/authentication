@@ -8,11 +8,8 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import com.portfoliopro.auth.dto.MailBody;
-import com.portfoliopro.auth.entities.Otp;
-import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.event.PasswordResetEvent;
 import com.portfoliopro.auth.service.EmailService;
-import com.portfoliopro.auth.service.PasswordResetService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,26 +18,24 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @RequiredArgsConstructor
 public class PasswordResetEventListener implements ApplicationListener<PasswordResetEvent> {
-    private final PasswordResetService passwordResetService;
     private final EmailService emailService;
     private final TemplateEngine templateEngine;
 
     @Override
     public void onApplicationEvent(@NonNull PasswordResetEvent event) {
-        User user = event.getUser();
-        Otp otp = passwordResetService.createOtp(user);
-        if (otp.equals(user.getOtp())) {
-            return;
-        }
+        String email = event.getPasswordResetDTO().getEmail();
+        String firstName = event.getPasswordResetDTO().getFirstName();
+        String lastName = event.getPasswordResetDTO().getLastName();
+        long otp = event.getPasswordResetDTO().getToken();
 
         Context context = new Context();
-        context.setVariable("firstName", StringUtils.capitalize(user.getFirstName()));
-        context.setVariable("lastName", StringUtils.capitalize(user.getLastName()));
-        context.setVariable("otp", otp.getOtp());
+        context.setVariable("firstName", StringUtils.capitalize(firstName));
+        context.setVariable("lastName", StringUtils.capitalize(lastName));
+        context.setVariable("otp", otp);
 
         String htmlTemplate = templateEngine.process("password_reset_email", context);
 
-        MailBody mailBody = new MailBody(user.getEmail(), "Password Reset",
+        MailBody mailBody = new MailBody(email, "Password Reset",
                 htmlTemplate);
         try {
             emailService.sendEmail(mailBody);
