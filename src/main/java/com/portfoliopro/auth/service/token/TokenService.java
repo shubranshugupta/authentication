@@ -24,7 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class TokenService<T extends Token> {
     private final TokenRepository<T> tokenRepository;
 
-    @Value("${auth.token.verify-expiration}")
+    @Value("${auth.token.token-expiration}")
     private long expireTime;
     private static final Random random = new SecureRandom();
 

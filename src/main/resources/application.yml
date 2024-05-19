@@ -37,13 +37,13 @@ server:
     port: 8080
 
 auth:
+    base-url: http://localhost:${server.port}
     token:
         secret-key: ${JWT_SECRET_KEY}
         # todo: change expiration time
-        expiration: 120000
+        jwt-expiration: 120000
         refresh-expiration: 300000
-        verify-expiration: 30000
-        otp-expiration: 30000
+        token-expiration: 30000
     
     cors:
         allowed-origins:

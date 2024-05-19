@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 @Configuration
 @ConfigurationProperties("auth")
 public class AuthConfigProperties {
+    private String baseUrl;
     private TokenConfigProperties token = new TokenConfigProperties();
     private CorsConfigProperties cors = new CorsConfigProperties();
 
@@ -19,10 +20,9 @@ public class AuthConfigProperties {
     @NoArgsConstructor
     public static class TokenConfigProperties {
         private String secretKey;
-        private long expiration;
+        private long jwtExpiration;
         private long refreshExpiration;
-        private long verifyExpiration;
-        private long otpExpiration;
+        private long tokenExpiration;
     }
 
     @Data
