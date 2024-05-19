@@ -1,34 +1,35 @@
-package com.portfoliopro.auth.entities;
+package com.portfoliopro.auth.entities.token;
 
 import java.sql.Date;
 import java.time.Instant;
 
+import lombok.Getter;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import org.hibernate.annotations.CreationTimestamp;
+
+import com.portfoliopro.auth.entities.User;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
 import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
-@Data
+@Getter
+@Setter
 @Entity
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "verification_tokens")
-public class VerificationToken {
+@Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+public abstract class Token {
     @Id
     @GeneratedValue
     private Integer id;
-
-    @Column(name = "token", nullable = false, length = 1000)
-    private String verifyToken;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)
@@ -39,4 +40,10 @@ public class VerificationToken {
 
     @OneToOne
     private User user;
+
+    public abstract String getToken();
+
+    public abstract void setToken(String token);
+
+    public abstract boolean equals(Token obj);
 }
