@@ -7,6 +7,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.core.io.ClassPathResource;
 
 import com.portfoliopro.auth.dto.MailBody;
 
@@ -33,6 +34,7 @@ public class EmailService {
         msgHelper.setFrom(FROM_EMAIL, SENDER_NAME);
         msgHelper.setSubject(mailBody.getSubject());
         msgHelper.setText(mailBody.getText(), true);
+        msgHelper.addInline("portfolioproLogo", new ClassPathResource("static/logo_300.png"));
 
         javaMailSender.send(mimeMessage);
     }

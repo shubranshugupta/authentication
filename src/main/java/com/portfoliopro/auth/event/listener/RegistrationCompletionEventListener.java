@@ -27,11 +27,14 @@ public class RegistrationCompletionEventListener implements ApplicationListener<
         String firstName = event.getTokenEmailDTO().getFirstName();
         String lastName = event.getTokenEmailDTO().getLastName();
         String appUrl = event.getTokenEmailDTO().getToken();
+        String baseUrl = event.getTokenEmailDTO().getBaseUrl();
 
         Context context = new Context();
+        context.setVariable("title", "Welcome to PortfolioPro");
         context.setVariable("firstName", StringUtils.capitalize(firstName));
         context.setVariable("lastName", StringUtils.capitalize(lastName));
-        context.setVariable("appUrl", appUrl);
+        context.setVariable("verifyUrl", appUrl);
+        context.setVariable("baseUrl", baseUrl);
 
         String htmlTemplate = templateEngine.process("verify_registration_email", context);
 

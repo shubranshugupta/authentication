@@ -27,11 +27,14 @@ public class PasswordResetEventListener implements ApplicationListener<PasswordR
         String firstName = event.getPasswordResetDTO().getFirstName();
         String lastName = event.getPasswordResetDTO().getLastName();
         String otp = event.getPasswordResetDTO().getToken();
+        String baseUrl = event.getPasswordResetDTO().getBaseUrl();
 
         Context context = new Context();
+        context.setVariable("title", "Welcome to PortfolioPro");
         context.setVariable("firstName", StringUtils.capitalize(firstName));
         context.setVariable("lastName", StringUtils.capitalize(lastName));
         context.setVariable("otp", otp);
+        context.setVariable("baseUrl", baseUrl);
 
         String htmlTemplate = templateEngine.process("password_reset_email", context);
 

@@ -37,4 +37,5 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserInfo(token, newInfo));
     }
 
+    // todo: add delete user endpoint
 }

@@ -1,5 +1,6 @@
 package com.portfoliopro.auth.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -39,6 +40,9 @@ public class AuthService {
         private final AuthenticationManager manager;
         private final ApplicationEventPublisher eventPublisher;
         private final TokenServiceFacade tokenService;
+
+        @Value("${auth.base-url}")
+        private String APP_URL;
 
         public MsgResponse registerUser(RegisterRequest request, final HttpServletRequest httpRequest) {
                 User user = userRepository.findByEmail(request.getEmail())
@@ -108,8 +112,7 @@ public class AuthService {
                                                 .build();
                         }
 
-                        String appUrl = "http://" + httpRequest.getServerName() + ":" + httpRequest.getServerPort()
-                                        + "/auth/verifyEmail?token=" + newToken.getToken()
+                        String appUrl = APP_URL + "/auth/verifyEmail?token=" + newToken.getToken()
                                         + "&email=" + user.getEmail();
 
                         TokenEmailDTO tokenEmailDTO = TokenEmailDTO.builder()
@@ -117,6 +120,7 @@ public class AuthService {
                                         .firstName(user.getFirstName())
                                         .lastName(user.getLastName())
                                         .token(appUrl)
+                                        .baseUrl(APP_URL)
                                         .build();
 
                         eventPublisher.publishEvent(new RegistrationCompletionEvent(user, tokenEmailDTO));
@@ -157,6 +161,7 @@ public class AuthService {
                                         .firstName(user.getFirstName())
                                         .lastName(user.getLastName())
                                         .token(otp.getToken())
+                                        .baseUrl(APP_URL)
                                         .build();
 
                         eventPublisher.publishEvent(new PasswordResetEvent(user, passwordResetDTO));
