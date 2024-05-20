@@ -33,4 +33,9 @@ public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
         return String.valueOf(random.nextLong(100_000, 999_999));
     }
 
+    @Override
+    protected void deleteToken(PasswordResetOtp origToken) {
+        otpRepository.delete(origToken);
+    }
+
 }

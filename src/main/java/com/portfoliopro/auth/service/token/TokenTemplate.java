@@ -60,9 +60,11 @@ public abstract class TokenTemplate<T extends Token> {
             throw new TokenExpireException(token + " Token is expired");
         }
 
-        tokenRepository.delete(origToken);
+        deleteToken(origToken);
         return true;
     }
+
+    protected abstract void deleteToken(T origToken);
 
     protected abstract T createNewToken();
 
