@@ -27,7 +27,7 @@ public class RefereshTokenService {
 
     public RefreshToken createRefereshToken(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
 
         RefreshToken refereshToken = user.getRefreshToken();
         if (refereshToken == null) {
