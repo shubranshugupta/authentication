@@ -10,9 +10,11 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import com.portfoliopro.auth.entities.token.DeleteAccountOtp;
 import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 import com.portfoliopro.auth.entities.token.VerificationToken;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -69,14 +71,17 @@ public class User implements UserDetails {
     @Column(name = "is_enabled", nullable = false)
     private boolean isEnabled;
 
-    @OneToOne(mappedBy = "user")
+    @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private RefreshToken refreshToken;
 
-    @OneToOne(mappedBy = "user")
+    @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private VerificationToken verificationToken;
 
-    @OneToOne(mappedBy = "user")
-    private PasswordResetOtp otp;
+    @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private PasswordResetOtp passwordResetOtp;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private DeleteAccountOtp deleteAccountOtp;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -10,7 +10,6 @@ import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.service.AuthService;
 
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,8 +28,8 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<MsgResponse> registerUser(
-            @RequestBody RegisterRequest request, final HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(authService.registerUser(request, httpRequest));
+            @RequestBody RegisterRequest request) {
+        return ResponseEntity.ok(authService.registerUser(request));
     }
 
     @PostMapping("/login")
@@ -46,15 +45,13 @@ public class AuthController {
     }
 
     @GetMapping("/verifyEmail")
-    public ResponseEntity<MsgResponse> verifyEmail(@RequestParam String email, @Nullable @RequestParam String token,
-            final HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(authService.verifyEmail(email, token, httpRequest));
+    public ResponseEntity<MsgResponse> verifyEmail(@RequestParam String email, @Nullable @RequestParam String token) {
+        return ResponseEntity.ok(authService.verifyEmail(email, token));
     }
 
     @PostMapping("/resetPassword")
     public ResponseEntity<MsgResponse> resetPassword(@RequestParam String email,
-            @Nullable @RequestBody ResetPasswordRequest request,
-            final HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(authService.resetPassword(email, request, httpRequest));
+            @Nullable @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(email, request));
     }
 }

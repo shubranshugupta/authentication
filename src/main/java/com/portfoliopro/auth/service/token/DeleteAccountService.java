@@ -5,26 +5,26 @@ import java.security.SecureRandom;
 import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.PasswordResetOtp;
-import com.portfoliopro.auth.repository.PasswordResetRepository;
+import com.portfoliopro.auth.entities.token.DeleteAccountOtp;
+import com.portfoliopro.auth.repository.DeleteAccountRepository;
 
 @Service
-public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
-    private final PasswordResetRepository otpRepository;
+public class DeleteAccountService extends TokenTemplate<DeleteAccountOtp> {
+    private final DeleteAccountRepository otpRepository;
     private final static SecureRandom random = new SecureRandom();
 
-    public PasswordResetService(PasswordResetRepository otpRepository) {
+    public DeleteAccountService(DeleteAccountRepository otpRepository) {
         super(otpRepository);
         this.otpRepository = otpRepository;
     }
 
     @Override
-    protected PasswordResetOtp createNewToken() {
-        return new PasswordResetOtp();
+    protected DeleteAccountOtp createNewToken() {
+        return new DeleteAccountOtp();
     }
 
     @Override
-    protected PasswordResetOtp getTokenFromUser(User user) {
+    protected DeleteAccountOtp getTokenFromUser(User user) {
         return otpRepository.findByUser(user).orElse(null);
     }
 
@@ -34,8 +34,6 @@ public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
     }
 
     @Override
-    protected void deleteToken(PasswordResetOtp origToken) {
-        otpRepository.delete(origToken);
+    protected void deleteToken(DeleteAccountOtp origToken) {
     }
-
 }
