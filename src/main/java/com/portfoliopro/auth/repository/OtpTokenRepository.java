@@ -5,8 +5,8 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.Token;
+import com.portfoliopro.auth.entities.token.Otp;
 
-public interface TokenRepository<T extends Token> extends JpaRepository<T, Integer> {
-    Optional<T> findByUser(User user);
+public interface OtpTokenRepository extends JpaRepository<Otp, Integer> {
+    Optional<Otp> findByUser(User user);
 }

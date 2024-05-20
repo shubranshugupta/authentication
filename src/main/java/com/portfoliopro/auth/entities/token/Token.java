@@ -13,19 +13,21 @@ import org.hibernate.annotations.CreationTimestamp;
 import com.portfoliopro.auth.entities.User;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
+// import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
-import jakarta.persistence.Inheritance;
-import jakarta.persistence.InheritanceType;
+// import jakarta.persistence.Inheritance;
+// import jakarta.persistence.InheritanceType;
+import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.OneToOne;
 
 @Getter
 @Setter
-@Entity
+// @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+// @Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+@MappedSuperclass
 public abstract class Token {
     @Id
     @GeneratedValue
