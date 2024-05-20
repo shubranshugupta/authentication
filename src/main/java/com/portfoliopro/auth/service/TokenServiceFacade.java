@@ -3,7 +3,7 @@ package com.portfoliopro.auth.service;
 import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.Otp;
+import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 import com.portfoliopro.auth.entities.token.Token;
 import com.portfoliopro.auth.entities.token.VerificationToken;
 import com.portfoliopro.auth.service.token.TokenTemplate;
@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TokenServiceFacade {
     private final TokenTemplate<VerificationToken> verificationTokenService;
-    private final TokenTemplate<Otp> passwordResetService;
+    private final TokenTemplate<PasswordResetOtp> passwordResetService;
 
     public Token createToken(User user, TokenType tokenType) {
         switch (tokenType) {

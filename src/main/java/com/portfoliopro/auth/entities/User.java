@@ -10,7 +10,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import com.portfoliopro.auth.entities.token.Otp;
+import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 import com.portfoliopro.auth.entities.token.VerificationToken;
 
 import jakarta.persistence.Column;
@@ -76,7 +76,7 @@ public class User implements UserDetails {
     private VerificationToken verificationToken;
 
     @OneToOne(mappedBy = "user")
-    private Otp otp;
+    private PasswordResetOtp otp;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
