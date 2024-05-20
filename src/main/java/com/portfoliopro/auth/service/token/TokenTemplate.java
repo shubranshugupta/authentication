@@ -22,6 +22,7 @@ import com.portfoliopro.auth.exception.TokenExpireException;
 // import lombok.RequiredArgsConstructor;
 
 public abstract class TokenTemplate<T extends Token> {
+    // todo: need to add event publisher in this class
     private final JpaRepository<T, Integer> tokenRepository;
     @Value("${auth.token.token-expiration}")
     private long expireTime;

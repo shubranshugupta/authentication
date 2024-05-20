@@ -1,10 +1,12 @@
 package com.portfoliopro.auth.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.portfoliopro.auth.dto.request.DeleteAccountRequest;
 import com.portfoliopro.auth.dto.request.UpdateUserRequest;
 import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.response.UserResposne;
@@ -37,5 +39,10 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserInfo(token, newInfo));
     }
 
-    // todo: add delete user endpoint
+    @PostMapping("/delete")
+    public ResponseEntity<MsgResponse> getMethodName(@RequestHeader("Authorization") String token,
+            @Nullable @RequestBody DeleteAccountRequest request) {
+        return ResponseEntity.ok(userService.deleteUser(token, request));
+    }
+
 }
