@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "otp")
+@Table(name = "password_reset_otp")
 public class PasswordResetOtp extends Token {
     @Column(name = "otp", nullable = false)
     private long otp;
