@@ -5,6 +5,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 
 import com.portfoliopro.auth.exception.InvalidTokenException;
+import com.portfoliopro.auth.exception.TokenAlreadyExistsException;
 import com.portfoliopro.auth.exception.TokenExpireException;
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
 
@@ -61,6 +62,13 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
                     HttpStatusCode.valueOf(403),
                     e.getMessage());
             error.setProperty("msg", "Invalid Token");
+        }
+
+        if (e instanceof TokenAlreadyExistsException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(403),
+                    e.getMessage());
+            error.setProperty("msg", "Token already exists");
         }
 
         if (nextHandler == null && error == null) {

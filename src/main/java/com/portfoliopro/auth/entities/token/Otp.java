@@ -27,7 +27,7 @@ public class Otp extends Token {
     @Override
     public boolean equals(Token obj) {
         if (obj instanceof Otp) {
-            return this.otp == Long.parseLong(obj.getToken());
+            return this.otp == Long.parseLong(obj.getToken()) && this.getId().equals(obj.getId());
         }
 
         return false;

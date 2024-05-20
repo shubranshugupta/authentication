@@ -106,11 +106,6 @@ public class AuthService {
                 if (token == null) {
                         VerificationToken newToken = (VerificationToken) tokenService.createToken(user,
                                         TokenType.VERFICATION_TOKEN);
-                        if (newToken.equals(user.getVerificationToken())) {
-                                return MsgResponse.builder()
-                                                .msg("Verification email already sent")
-                                                .build();
-                        }
 
                         String appUrl = APP_URL + "/auth/verifyEmail?token=" + newToken.getToken()
                                         + "&email=" + user.getEmail();
@@ -150,11 +145,6 @@ public class AuthService {
 
                 if (request == null) {
                         Otp otp = (Otp) tokenService.createToken(user, TokenType.RESET_PASSWORD_TOKEN);
-                        if (otp.equals(user.getOtp())) {
-                                return MsgResponse.builder()
-                                                .msg("Otp already sent")
-                                                .build();
-                        }
 
                         TokenEmailDTO passwordResetDTO = TokenEmailDTO.builder()
                                         .email(user.getEmail())
