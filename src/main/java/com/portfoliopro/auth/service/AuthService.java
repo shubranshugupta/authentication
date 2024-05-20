@@ -27,7 +27,6 @@ import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 import com.portfoliopro.auth.service.token.TokenType;
 
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -44,7 +43,7 @@ public class AuthService {
         @Value("${auth.base-url}")
         private String APP_URL;
 
-        public MsgResponse registerUser(RegisterRequest request, final HttpServletRequest httpRequest) {
+        public MsgResponse registerUser(RegisterRequest request) {
                 User user = userRepository.findByEmail(request.getEmail())
                                 .orElse(null);
                 if (user != null)
@@ -61,7 +60,7 @@ public class AuthService {
 
                 userRepository.save(user);
 
-                return verifyEmail(user.getEmail(), null, httpRequest);
+                return verifyEmail(user.getEmail(), null);
         }
 
         public AuthResponse loginUser(LoginRequest request) {
@@ -94,7 +93,7 @@ public class AuthService {
                                 .build();
         }
 
-        public MsgResponse verifyEmail(String email, String token, HttpServletRequest httpRequest) {
+        public MsgResponse verifyEmail(String email, String token) {
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
 
@@ -134,8 +133,7 @@ public class AuthService {
                                 .build();
         }
 
-        public MsgResponse resetPassword(String email, @Nullable ResetPasswordRequest request,
-                        HttpServletRequest httpRequest) {
+        public MsgResponse resetPassword(String email, @Nullable ResetPasswordRequest request) {
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
                 if (!user.isEnabled())

@@ -32,4 +32,9 @@ public class VerificationTokenService extends TokenTemplate<VerificationToken> {
         return UUID.randomUUID().toString();
     }
 
+    @Override
+    protected void deleteToken(VerificationToken origToken) {
+        verificationTokenRepository.delete(origToken);
+    }
+
 }
