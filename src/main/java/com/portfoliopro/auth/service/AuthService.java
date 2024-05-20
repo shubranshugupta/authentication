@@ -22,7 +22,7 @@ import com.portfoliopro.auth.entities.token.VerificationToken;
 import com.portfoliopro.auth.event.PasswordResetEvent;
 import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
-import com.portfoliopro.auth.entities.token.Otp;
+import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 import com.portfoliopro.auth.service.token.TokenType;
@@ -144,7 +144,8 @@ public class AuthService {
                                         .build();
 
                 if (request == null) {
-                        Otp otp = (Otp) tokenService.createToken(user, TokenType.RESET_PASSWORD_TOKEN);
+                        PasswordResetOtp otp = (PasswordResetOtp) tokenService.createToken(user,
+                                        TokenType.RESET_PASSWORD_TOKEN);
 
                         TokenEmailDTO passwordResetDTO = TokenEmailDTO.builder()
                                         .email(user.getEmail())

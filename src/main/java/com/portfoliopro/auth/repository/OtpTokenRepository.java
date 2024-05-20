@@ -5,8 +5,8 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.Otp;
+import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 
-public interface OtpTokenRepository extends JpaRepository<Otp, Integer> {
-    Optional<Otp> findByUser(User user);
+public interface OtpTokenRepository extends JpaRepository<PasswordResetOtp, Integer> {
+    Optional<PasswordResetOtp> findByUser(User user);
 }

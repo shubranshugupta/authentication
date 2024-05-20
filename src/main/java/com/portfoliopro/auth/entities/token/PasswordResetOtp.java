@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "otp")
-public class Otp extends Token {
+public class PasswordResetOtp extends Token {
     @Column(name = "otp", nullable = false)
     private long otp;
 
@@ -26,7 +26,7 @@ public class Otp extends Token {
 
     @Override
     public boolean equals(Token obj) {
-        if (obj instanceof Otp) {
+        if (obj instanceof PasswordResetOtp) {
             return this.otp == Long.parseLong(obj.getToken()) && this.getId().equals(obj.getId());
         }
 

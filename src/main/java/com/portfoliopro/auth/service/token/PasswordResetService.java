@@ -5,11 +5,11 @@ import java.security.SecureRandom;
 import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.Otp;
+import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 import com.portfoliopro.auth.repository.OtpTokenRepository;
 
 @Service
-public class PasswordResetService extends TokenTemplate<Otp> {
+public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
     private final OtpTokenRepository otpRepository;
     private final static SecureRandom random = new SecureRandom();
 
@@ -19,12 +19,12 @@ public class PasswordResetService extends TokenTemplate<Otp> {
     }
 
     @Override
-    protected Otp createNewToken() {
-        return new Otp();
+    protected PasswordResetOtp createNewToken() {
+        return new PasswordResetOtp();
     }
 
     @Override
-    protected Otp getTokenFromUser(User user) {
+    protected PasswordResetOtp getTokenFromUser(User user) {
         return otpRepository.findByUser(user).orElse(null);
     }
 
