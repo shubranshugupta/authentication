@@ -6,14 +6,14 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.entities.token.PasswordResetOtp;
-import com.portfoliopro.auth.repository.OtpTokenRepository;
+import com.portfoliopro.auth.repository.PasswordResetRepository;
 
 @Service
 public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
-    private final OtpTokenRepository otpRepository;
+    private final PasswordResetRepository otpRepository;
     private final static SecureRandom random = new SecureRandom();
 
-    public PasswordResetService(OtpTokenRepository otpRepository) {
+    public PasswordResetService(PasswordResetRepository otpRepository) {
         super(otpRepository);
         this.otpRepository = otpRepository;
     }
