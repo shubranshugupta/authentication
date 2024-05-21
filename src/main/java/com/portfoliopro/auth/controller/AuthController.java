@@ -5,11 +5,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.portfoliopro.auth.dto.response.AuthResponse;
 import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
-import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.service.AuthService;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -34,14 +35,13 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> loginUser(
-            @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.loginUser(request));
+            @RequestBody LoginRequest request, HttpServletResponse response) {
+        return ResponseEntity.ok(authService.loginUser(request, response));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refreshToken(
-            @RequestBody RefreshTokenRequest request) {
-        return ResponseEntity.ok(authService.verifyRefreshToken(request));
+    public ResponseEntity<AuthResponse> refreshToken(@RequestHeader("Cookie") String refreshToken) {
+        return ResponseEntity.ok(authService.verifyRefreshToken(refreshToken));
     }
 
     @GetMapping("/verifyEmail")

@@ -1,4 +1,6 @@
-package com.portfoliopro.auth.entities.token;
+package com.portfoliopro.auth.entities.token.impl;
+
+import com.portfoliopro.auth.entities.token.Token;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

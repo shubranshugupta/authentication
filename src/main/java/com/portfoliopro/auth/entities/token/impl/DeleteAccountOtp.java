@@ -1,4 +1,6 @@
-package com.portfoliopro.auth.entities.token;
+package com.portfoliopro.auth.entities.token.impl;
+
+import com.portfoliopro.auth.entities.token.Token;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,7 +28,7 @@ public class DeleteAccountOtp extends Token {
 
     @Override
     public boolean equals(Token obj) {
-        if (obj instanceof PasswordResetOtp) {
+        if (obj instanceof DeleteAccountOtp) {
             return this.otp == Long.parseLong(obj.getToken()) && this.getId().equals(obj.getId());
         }
 

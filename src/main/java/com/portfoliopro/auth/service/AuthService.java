@@ -1,7 +1,6 @@
 package com.portfoliopro.auth.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,22 +10,18 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
 import com.portfoliopro.auth.dto.response.MsgResponse;
-import com.portfoliopro.auth.dto.TokenEmailDTO;
 import com.portfoliopro.auth.dto.request.LoginRequest;
-import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.VerificationToken;
-import com.portfoliopro.auth.event.PasswordResetEvent;
-import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
-import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 import com.portfoliopro.auth.service.token.TokenType;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -37,11 +32,13 @@ public class AuthService {
         private final JwtService jwtService;
         private final RefereshTokenService refereshTokenService;
         private final AuthenticationManager manager;
-        private final ApplicationEventPublisher eventPublisher;
         private final TokenServiceFacade tokenService;
 
         @Value("${auth.base-url}")
         private String APP_URL;
+
+        @Value("${auth.token.refresh-expiration}")
+        private long REFRESH_EXPIRATION;
 
         public MsgResponse registerUser(RegisterRequest request) {
                 User user = userRepository.findByEmail(request.getEmail())
@@ -63,7 +60,7 @@ public class AuthService {
                 return verifyEmail(user.getEmail(), null);
         }
 
-        public AuthResponse loginUser(LoginRequest request) {
+        public AuthResponse loginUser(LoginRequest request, HttpServletResponse response) {
                 User user = userRepository.findByEmail(request.getEmail())
                                 .orElseThrow(() -> new UsernameNotFoundException(
                                                 request.getEmail() + " user not found"));
@@ -76,20 +73,33 @@ public class AuthService {
                 String accessToken = jwtService.generateToken(user);
                 String refreshToken = refereshTokenService.createRefereshToken(request.getEmail())
                                 .getRefreshToken();
+
+                Cookie cookie = new Cookie("refreshToken", refreshToken);
+                cookie.setPath(APP_URL + "/auth");
+                cookie.setHttpOnly(true);
+                cookie.setMaxAge((int) REFRESH_EXPIRATION / 1000);
+
+                if (APP_URL.startsWith("https://")) {
+                        cookie.setSecure(true);
+                }
+
+                response.addCookie(cookie);
                 return AuthResponse.builder()
                                 .accessToken(accessToken)
-                                .refreshToken(refreshToken)
                                 .build();
         }
 
-        public AuthResponse verifyRefreshToken(RefreshTokenRequest request) {
-                RefreshToken refToken = refereshTokenService.verifyRefereshToken(request.getRefreshToken());
+        public AuthResponse verifyRefreshToken(String refreshToken) {
+                if (!refreshToken.startsWith("refreshToken="))
+                        throw new IllegalArgumentException("Invalid refresh token");
+
+                refreshToken = refreshToken.substring(13);
+                RefreshToken refToken = refereshTokenService.verifyRefereshToken(refreshToken);
                 User user = refToken.getUser();
 
                 String accessToken = jwtService.generateToken(user);
                 return AuthResponse.builder()
                                 .accessToken(accessToken)
-                                .refreshToken(request.getRefreshToken())
                                 .build();
         }
 
@@ -103,21 +113,8 @@ public class AuthService {
                                         .build();
 
                 if (token == null) {
-                        VerificationToken newToken = (VerificationToken) tokenService.createToken(user,
+                        tokenService.createTokenAndSendMail(user,
                                         TokenType.VERFICATION_TOKEN);
-
-                        String appUrl = APP_URL + "/auth/verifyEmail?token=" + newToken.getToken()
-                                        + "&email=" + user.getEmail();
-
-                        TokenEmailDTO tokenEmailDTO = TokenEmailDTO.builder()
-                                        .email(user.getEmail())
-                                        .firstName(user.getFirstName())
-                                        .lastName(user.getLastName())
-                                        .token(appUrl)
-                                        .baseUrl(APP_URL)
-                                        .build();
-
-                        eventPublisher.publishEvent(new RegistrationCompletionEvent(user, tokenEmailDTO));
 
                         return MsgResponse.builder()
                                         .msg("Verification email sent")
@@ -142,18 +139,8 @@ public class AuthService {
                                         .build();
 
                 if (request == null) {
-                        PasswordResetOtp otp = (PasswordResetOtp) tokenService.createToken(user,
+                        tokenService.createTokenAndSendMail(user,
                                         TokenType.RESET_PASSWORD_TOKEN);
-
-                        TokenEmailDTO passwordResetDTO = TokenEmailDTO.builder()
-                                        .email(user.getEmail())
-                                        .firstName(user.getFirstName())
-                                        .lastName(user.getLastName())
-                                        .token(otp.getToken())
-                                        .baseUrl(APP_URL)
-                                        .build();
-
-                        eventPublisher.publishEvent(new PasswordResetEvent(user, passwordResetDTO));
 
                         return MsgResponse.builder()
                                         .msg("Password reset email sent")
