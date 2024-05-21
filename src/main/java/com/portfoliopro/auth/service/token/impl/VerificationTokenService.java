@@ -1,4 +1,4 @@
-package com.portfoliopro.auth.service.token;
+package com.portfoliopro.auth.service.token.impl;
 
 import java.util.UUID;
 
@@ -8,9 +8,10 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.TokenEmailDTO;
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.VerificationToken;
+import com.portfoliopro.auth.entities.token.impl.VerificationToken;
 import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.repository.VerificationTokenRepository;
+import com.portfoliopro.auth.service.token.TokenTemplate;
 
 @Service
 public class VerificationTokenService extends TokenTemplate<VerificationToken> {

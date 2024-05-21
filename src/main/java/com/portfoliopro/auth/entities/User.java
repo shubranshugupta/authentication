@@ -10,9 +10,9 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import com.portfoliopro.auth.entities.token.DeleteAccountOtp;
-import com.portfoliopro.auth.entities.token.PasswordResetOtp;
-import com.portfoliopro.auth.entities.token.VerificationToken;
+import com.portfoliopro.auth.entities.token.impl.DeleteAccountOtp;
+import com.portfoliopro.auth.entities.token.impl.PasswordResetOtp;
+import com.portfoliopro.auth.entities.token.impl.VerificationToken;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;

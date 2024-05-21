@@ -1,4 +1,4 @@
-package com.portfoliopro.auth.service.token;
+package com.portfoliopro.auth.service.token.impl;
 
 import java.security.SecureRandom;
 
@@ -8,9 +8,10 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.TokenEmailDTO;
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.DeleteAccountOtp;
+import com.portfoliopro.auth.entities.token.impl.DeleteAccountOtp;
 import com.portfoliopro.auth.event.DeleteAccountEvent;
 import com.portfoliopro.auth.repository.DeleteAccountRepository;
+import com.portfoliopro.auth.service.token.TokenTemplate;
 
 @Service
 public class DeleteAccountService extends TokenTemplate<DeleteAccountOtp> {

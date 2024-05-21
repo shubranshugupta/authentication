@@ -3,10 +3,10 @@ package com.portfoliopro.auth.service;
 import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.DeleteAccountOtp;
-import com.portfoliopro.auth.entities.token.PasswordResetOtp;
+import com.portfoliopro.auth.entities.token.impl.DeleteAccountOtp;
+import com.portfoliopro.auth.entities.token.impl.PasswordResetOtp;
 import com.portfoliopro.auth.entities.token.Token;
-import com.portfoliopro.auth.entities.token.VerificationToken;
+import com.portfoliopro.auth.entities.token.impl.VerificationToken;
 import com.portfoliopro.auth.service.token.TokenTemplate;
 import com.portfoliopro.auth.service.token.TokenType;
 
