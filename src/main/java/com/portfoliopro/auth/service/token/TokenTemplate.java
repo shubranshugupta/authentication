@@ -1,34 +1,30 @@
 package com.portfoliopro.auth.service.token;
 
-// import java.util.Random;
-// import java.util.function.Supplier;
-// import java.security.SecureRandom;
 import java.time.Instant;
-// import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.repository.JpaRepository;
-// import org.springframework.stereotype.Service;
 
-// import com.portfoliopro.auth.repository.TokenRepository;
+import com.portfoliopro.auth.dto.TokenEmailDTO;
 import com.portfoliopro.auth.entities.User;
-// import com.portfoliopro.auth.entities.token.Otp;
 import com.portfoliopro.auth.entities.token.Token;
-// import com.portfoliopro.auth.entities.token.VerificationToken;
 import com.portfoliopro.auth.exception.InvalidTokenException;
 import com.portfoliopro.auth.exception.TokenAlreadyExistsException;
 import com.portfoliopro.auth.exception.TokenExpireException;
 
-// import lombok.RequiredArgsConstructor;
-
 public abstract class TokenTemplate<T extends Token> {
-    // todo: need to add event publisher in this class
     private final JpaRepository<T, Integer> tokenRepository;
+    private final ApplicationEventPublisher eventPublisher;
     @Value("${auth.token.token-expiration}")
     private long expireTime;
+    @Value("${auth.base-url}")
+    private String APP_URL;
 
-    public TokenTemplate(JpaRepository<T, Integer> tokenRepository) {
+    public TokenTemplate(JpaRepository<T, Integer> tokenRepository, ApplicationEventPublisher eventPublisher) {
         this.tokenRepository = tokenRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public T createToken(User user) {
@@ -52,7 +48,7 @@ public abstract class TokenTemplate<T extends Token> {
     public boolean verifyToken(User user, String token) {
         T origToken = getTokenFromUser(user);
 
-        if (!origToken.getToken().equals(token)) {
+        if (origToken == null || !origToken.getToken().equals(token)) {
             throw new InvalidTokenException(token + " token is invalid");
         }
 
@@ -65,6 +61,16 @@ public abstract class TokenTemplate<T extends Token> {
         return true;
     }
 
+    public void publishEmailEvent(User user, T newToken) {
+        TokenEmailDTO tokenEmailDTO = getTokenEmailDto(user, newToken);
+        ApplicationEvent event = getApplicationEvent(user, tokenEmailDTO);
+        eventPublisher.publishEvent(event);
+    }
+
+    public String getAppUrl() {
+        return APP_URL;
+    }
+
     protected abstract void deleteToken(T origToken);
 
     protected abstract T createNewToken();
@@ -72,4 +78,8 @@ public abstract class TokenTemplate<T extends Token> {
     protected abstract T getTokenFromUser(User user);
 
     protected abstract String generateRandomTokenID();
+
+    protected abstract ApplicationEvent getApplicationEvent(User user, TokenEmailDTO tokenEmailDTO);
+
+    protected abstract TokenEmailDTO getTokenEmailDto(User user, T newToken);
 }

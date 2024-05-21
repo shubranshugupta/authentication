@@ -1,7 +1,6 @@
 package com.portfoliopro.auth.service;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,18 +10,13 @@ import org.springframework.stereotype.Service;
 
 import com.portfoliopro.auth.dto.response.AuthResponse;
 import com.portfoliopro.auth.dto.response.MsgResponse;
-import com.portfoliopro.auth.dto.TokenEmailDTO;
 import com.portfoliopro.auth.dto.request.LoginRequest;
 import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
-import com.portfoliopro.auth.entities.token.VerificationToken;
-import com.portfoliopro.auth.event.PasswordResetEvent;
-import com.portfoliopro.auth.event.RegistrationCompletionEvent;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
-import com.portfoliopro.auth.entities.token.PasswordResetOtp;
 import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 import com.portfoliopro.auth.service.token.TokenType;
@@ -37,7 +31,6 @@ public class AuthService {
         private final JwtService jwtService;
         private final RefereshTokenService refereshTokenService;
         private final AuthenticationManager manager;
-        private final ApplicationEventPublisher eventPublisher;
         private final TokenServiceFacade tokenService;
 
         @Value("${auth.base-url}")
@@ -103,21 +96,8 @@ public class AuthService {
                                         .build();
 
                 if (token == null) {
-                        VerificationToken newToken = (VerificationToken) tokenService.createToken(user,
+                        tokenService.createTokenAndSendMail(user,
                                         TokenType.VERFICATION_TOKEN);
-
-                        String appUrl = APP_URL + "/auth/verifyEmail?token=" + newToken.getToken()
-                                        + "&email=" + user.getEmail();
-
-                        TokenEmailDTO tokenEmailDTO = TokenEmailDTO.builder()
-                                        .email(user.getEmail())
-                                        .firstName(user.getFirstName())
-                                        .lastName(user.getLastName())
-                                        .token(appUrl)
-                                        .baseUrl(APP_URL)
-                                        .build();
-
-                        eventPublisher.publishEvent(new RegistrationCompletionEvent(user, tokenEmailDTO));
 
                         return MsgResponse.builder()
                                         .msg("Verification email sent")
@@ -142,18 +122,8 @@ public class AuthService {
                                         .build();
 
                 if (request == null) {
-                        PasswordResetOtp otp = (PasswordResetOtp) tokenService.createToken(user,
+                        tokenService.createTokenAndSendMail(user,
                                         TokenType.RESET_PASSWORD_TOKEN);
-
-                        TokenEmailDTO passwordResetDTO = TokenEmailDTO.builder()
-                                        .email(user.getEmail())
-                                        .firstName(user.getFirstName())
-                                        .lastName(user.getLastName())
-                                        .token(otp.getToken())
-                                        .baseUrl(APP_URL)
-                                        .build();
-
-                        eventPublisher.publishEvent(new PasswordResetEvent(user, passwordResetDTO));
 
                         return MsgResponse.builder()
                                         .msg("Password reset email sent")
