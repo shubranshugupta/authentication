@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import com.portfoliopro.auth.dto.response.AuthResponse;
 import com.portfoliopro.auth.dto.response.MsgResponse;
 import com.portfoliopro.auth.dto.request.LoginRequest;
-import com.portfoliopro.auth.dto.request.RefreshTokenRequest;
 import com.portfoliopro.auth.dto.request.RegisterRequest;
 import com.portfoliopro.auth.dto.request.ResetPasswordRequest;
 import com.portfoliopro.auth.entities.Role;
@@ -21,6 +20,8 @@ import com.portfoliopro.auth.entities.RefreshToken;
 import com.portfoliopro.auth.repository.UserRepository;
 import com.portfoliopro.auth.service.token.TokenType;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -35,6 +36,9 @@ public class AuthService {
 
         @Value("${auth.base-url}")
         private String APP_URL;
+
+        @Value("${auth.token.refresh-expiration}")
+        private long REFRESH_EXPIRATION;
 
         public MsgResponse registerUser(RegisterRequest request) {
                 User user = userRepository.findByEmail(request.getEmail())
@@ -56,7 +60,7 @@ public class AuthService {
                 return verifyEmail(user.getEmail(), null);
         }
 
-        public AuthResponse loginUser(LoginRequest request) {
+        public AuthResponse loginUser(LoginRequest request, HttpServletResponse response) {
                 User user = userRepository.findByEmail(request.getEmail())
                                 .orElseThrow(() -> new UsernameNotFoundException(
                                                 request.getEmail() + " user not found"));
@@ -69,20 +73,33 @@ public class AuthService {
                 String accessToken = jwtService.generateToken(user);
                 String refreshToken = refereshTokenService.createRefereshToken(request.getEmail())
                                 .getRefreshToken();
+
+                Cookie cookie = new Cookie("refreshToken", refreshToken);
+                cookie.setPath(APP_URL + "/auth");
+                cookie.setHttpOnly(true);
+                cookie.setMaxAge((int) REFRESH_EXPIRATION / 1000);
+
+                if (APP_URL.startsWith("https://")) {
+                        cookie.setSecure(true);
+                }
+
+                response.addCookie(cookie);
                 return AuthResponse.builder()
                                 .accessToken(accessToken)
-                                .refreshToken(refreshToken)
                                 .build();
         }
 
-        public AuthResponse verifyRefreshToken(RefreshTokenRequest request) {
-                RefreshToken refToken = refereshTokenService.verifyRefereshToken(request.getRefreshToken());
+        public AuthResponse verifyRefreshToken(String refreshToken) {
+                if (!refreshToken.startsWith("refreshToken="))
+                        throw new IllegalArgumentException("Invalid refresh token");
+
+                refreshToken = refreshToken.substring(13);
+                RefreshToken refToken = refereshTokenService.verifyRefereshToken(refreshToken);
                 User user = refToken.getUser();
 
                 String accessToken = jwtService.generateToken(user);
                 return AuthResponse.builder()
                                 .accessToken(accessToken)
-                                .refreshToken(request.getRefreshToken())
                                 .build();
         }
 
