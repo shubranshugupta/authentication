@@ -1,5 +1,7 @@
 package com.portfoliopro.auth.event.listener;
 
+import java.util.Map;
+
 import org.springframework.context.ApplicationListener;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
@@ -23,11 +25,12 @@ public class PasswordResetEventListener implements ApplicationListener<PasswordR
 
     @Override
     public void onApplicationEvent(@NonNull PasswordResetEvent event) {
-        String email = event.getPasswordResetDTO().getEmail();
-        String firstName = event.getPasswordResetDTO().getFirstName();
-        String lastName = event.getPasswordResetDTO().getLastName();
-        String otp = event.getPasswordResetDTO().getToken();
-        String baseUrl = event.getPasswordResetDTO().getBaseUrl();
+        Map<String, String> data = event.getPasswordResetDTO().getAllData();
+        String email = data.get("email");
+        String firstName = data.get("firstName");
+        String lastName = data.get("lastName");
+        String otp = data.get("token");
+        String baseUrl = data.get("baseUrl");
 
         Context context = new Context();
         context.setVariable("title", "Welcome to PortfolioPro");

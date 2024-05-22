@@ -1,5 +1,7 @@
 package com.portfoliopro.auth.event.listener;
 
+import java.util.Map;
+
 import org.springframework.context.ApplicationListener;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
@@ -23,11 +25,12 @@ public class DeleteAccountEventListner implements ApplicationListener<DeleteAcco
 
     @Override
     public void onApplicationEvent(@NonNull DeleteAccountEvent event) {
-        String email = event.getDeleteAccountDTO().getEmail();
-        String firstName = event.getDeleteAccountDTO().getFirstName();
-        String lastName = event.getDeleteAccountDTO().getLastName();
-        String otp = event.getDeleteAccountDTO().getToken();
-        String baseUrl = event.getDeleteAccountDTO().getBaseUrl();
+        Map<String, String> data = event.getDeleteAccountDTO().getAllData();
+        String email = data.get("email");
+        String firstName = data.get("firstName");
+        String lastName = data.get("lastName");
+        String otp = data.get("token");
+        String baseUrl = data.get("baseUrl");
 
         Context context = new Context();
         context.setVariable("title", "Welcome to PortfolioPro");
