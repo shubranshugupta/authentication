@@ -7,7 +7,7 @@ import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.portfoliopro.auth.dto.TokenEmailDTO;
+import com.portfoliopro.auth.dto.EmailDTO;
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.entities.token.Token;
 import com.portfoliopro.auth.exception.InvalidTokenException;
@@ -62,7 +62,7 @@ public abstract class TokenTemplate<T extends Token> {
     }
 
     public void publishEmailEvent(User user, T newToken) {
-        TokenEmailDTO tokenEmailDTO = getTokenEmailDto(user, newToken);
+        EmailDTO tokenEmailDTO = getEmailDto(user, newToken);
         ApplicationEvent event = getApplicationEvent(user, tokenEmailDTO);
         eventPublisher.publishEvent(event);
     }
@@ -79,7 +79,7 @@ public abstract class TokenTemplate<T extends Token> {
 
     protected abstract String generateRandomTokenID();
 
-    protected abstract ApplicationEvent getApplicationEvent(User user, TokenEmailDTO tokenEmailDTO);
+    protected abstract ApplicationEvent getApplicationEvent(User user, EmailDTO tokenEmailDTO);
 
-    protected abstract TokenEmailDTO getTokenEmailDto(User user, T newToken);
+    protected abstract EmailDTO getEmailDto(User user, T newToken);
 }

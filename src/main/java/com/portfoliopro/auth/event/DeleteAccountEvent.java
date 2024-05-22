@@ -2,7 +2,7 @@ package com.portfoliopro.auth.event;
 
 import org.springframework.context.ApplicationEvent;
 
-import com.portfoliopro.auth.dto.TokenEmailDTO;
+import com.portfoliopro.auth.dto.EmailDTO;
 import com.portfoliopro.auth.entities.User;
 
 import lombok.Getter;
@@ -12,9 +12,9 @@ import lombok.Setter;
 @Setter
 public class DeleteAccountEvent extends ApplicationEvent {
     private User user;
-    private TokenEmailDTO deleteAccountDTO;
+    private EmailDTO deleteAccountDTO;
 
-    public DeleteAccountEvent(User user, TokenEmailDTO deleteAccountDTO) {
+    public DeleteAccountEvent(User user, EmailDTO deleteAccountDTO) {
         super(user);
         this.user = user;
         this.deleteAccountDTO = deleteAccountDTO;

@@ -5,8 +5,10 @@ import java.security.SecureRandom;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
-import com.portfoliopro.auth.dto.TokenEmailDTO;
+import com.portfoliopro.auth.dto.EmailDTO;
+import com.portfoliopro.auth.dto.emaildtoimpl.TokenEmailDTO;
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.entities.token.impl.PasswordResetOtp;
 import com.portfoliopro.auth.event.PasswordResetEvent;
@@ -44,16 +46,16 @@ public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
     }
 
     @Override
-    protected ApplicationEvent getApplicationEvent(User user, TokenEmailDTO tokenEmailDTO) {
+    protected ApplicationEvent getApplicationEvent(User user, EmailDTO tokenEmailDTO) {
         return new PasswordResetEvent(user, tokenEmailDTO);
     }
 
     @Override
-    protected TokenEmailDTO getTokenEmailDto(User user, PasswordResetOtp newToken) {
+    protected EmailDTO getEmailDto(User user, PasswordResetOtp newToken) {
         return TokenEmailDTO.builder()
                 .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
+                .firstName(StringUtils.capitalize(user.getFirstName()))
+                .lastName(StringUtils.capitalize(user.getLastName()))
                 .token(newToken.getToken())
                 .baseUrl(getAppUrl())
                 .build();
