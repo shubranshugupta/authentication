@@ -5,13 +5,11 @@ import java.util.Map;
 import org.springframework.context.ApplicationListener;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-import org.thymeleaf.TemplateEngine;
-import org.thymeleaf.context.Context;
 
 import com.portfoliopro.auth.dto.MailBody;
 import com.portfoliopro.auth.event.DeleteAccountEvent;
 import com.portfoliopro.auth.service.EmailService;
+import com.portfoliopro.auth.utils.impl.TokenEmailMessageBodyBuilder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,27 +19,15 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DeleteAccountEventListner implements ApplicationListener<DeleteAccountEvent> {
     private final EmailService emailService;
-    private final TemplateEngine templateEngine;
+    private final TokenEmailMessageBodyBuilder msgBuilder;
 
     @Override
     public void onApplicationEvent(@NonNull DeleteAccountEvent event) {
+        msgBuilder.setTemplateName("delete_account_email");
         Map<String, String> data = event.getDeleteAccountDTO().getAllData();
-        String email = data.get("email");
-        String firstName = data.get("firstName");
-        String lastName = data.get("lastName");
-        String otp = data.get("token");
-        String baseUrl = data.get("baseUrl");
+        String htmlTemplate = msgBuilder.getMessage(data);
 
-        Context context = new Context();
-        context.setVariable("title", "Welcome to PortfolioPro");
-        context.setVariable("firstName", StringUtils.capitalize(firstName));
-        context.setVariable("lastName", StringUtils.capitalize(lastName));
-        context.setVariable("otp", otp);
-        context.setVariable("baseUrl", baseUrl);
-
-        String htmlTemplate = templateEngine.process("delete_account_email", context);
-
-        MailBody mailBody = new MailBody(email, "Delete Account",
+        MailBody mailBody = new MailBody(data.get("email"), "Delete Account",
                 htmlTemplate);
         try {
             emailService.sendEmail(mailBody);
