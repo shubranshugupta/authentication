@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import com.portfoliopro.auth.dto.EmailDTO;
 import com.portfoliopro.auth.dto.emaildtoimpl.TokenEmailDTO;
@@ -56,8 +57,8 @@ public class VerificationTokenService extends TokenTemplate<VerificationToken> {
 
         return TokenEmailDTO.builder()
                 .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
+                .firstName(StringUtils.capitalize(user.getFirstName()))
+                .lastName(StringUtils.capitalize(user.getLastName()))
                 .token(appUrl)
                 .baseUrl(getAppUrl())
                 .build();
