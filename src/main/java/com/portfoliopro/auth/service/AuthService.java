@@ -90,10 +90,6 @@ public class AuthService {
         }
 
         public AuthResponse verifyRefreshToken(String refreshToken) {
-                if (!refreshToken.startsWith("refreshToken="))
-                        throw new IllegalArgumentException("Invalid refresh token");
-
-                refreshToken = refreshToken.substring(13);
                 RefreshToken refToken = refereshTokenService.verifyRefereshToken(refreshToken);
                 User user = refToken.getUser();
 
