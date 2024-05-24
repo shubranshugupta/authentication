@@ -17,7 +17,6 @@ import com.portfoliopro.auth.entities.Role;
 import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.exception.UserAlreadyExistsException;
 import com.portfoliopro.auth.entities.RefreshToken;
-import com.portfoliopro.auth.repository.UserRepository;
 import com.portfoliopro.auth.service.token.TokenType;
 
 import jakarta.servlet.http.Cookie;
@@ -27,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-        private final UserRepository userRepository;
+        private final UserService userService;
         private final PasswordEncoder passwordEncoder;
         private final JwtService jwtService;
         private final RefereshTokenService refereshTokenService;
@@ -41,8 +40,7 @@ public class AuthService {
         private long REFRESH_EXPIRATION;
 
         public MsgResponse registerUser(RegisterRequest request) {
-                User user = userRepository.findByEmail(request.getEmail())
-                                .orElse(null);
+                User user = userService.getUserByEmail(request.getEmail());
                 if (user != null)
                         throw new UserAlreadyExistsException(request.getEmail() + " already exists");
 
@@ -55,15 +53,15 @@ public class AuthService {
                                 .isEnabled(false)
                                 .build();
 
-                userRepository.save(user);
+                userService.saveUser(user);
 
                 return verifyEmail(user.getEmail(), null);
         }
 
         public AuthResponse loginUser(LoginRequest request, HttpServletResponse response) {
-                User user = userRepository.findByEmail(request.getEmail())
-                                .orElseThrow(() -> new UsernameNotFoundException(
-                                                request.getEmail() + " user not found"));
+                User user = userService.getUserByEmail(request.getEmail());
+                if (user == null)
+                        throw new UsernameNotFoundException(request.getEmail() + " user not found");
 
                 manager.authenticate(
                                 new UsernamePasswordAuthenticationToken(
@@ -100,8 +98,10 @@ public class AuthService {
         }
 
         public MsgResponse verifyEmail(String email, String token) {
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
+                User user = userService.getUserByEmail(email);
+
+                if (user == null)
+                        throw new UsernameNotFoundException(email + " user not found");
 
                 if (user.isEnabled())
                         return MsgResponse.builder()
@@ -119,7 +119,7 @@ public class AuthService {
 
                 tokenService.verifyToken(user, token, TokenType.VERFICATION_TOKEN);
                 user.setEnabled(true);
-                userRepository.save(user);
+                userService.saveUser(user);
 
                 return MsgResponse.builder()
                                 .msg("Email verified successfully")
@@ -127,8 +127,10 @@ public class AuthService {
         }
 
         public MsgResponse resetPassword(String email, @Nullable ResetPasswordRequest request) {
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
+                User user = userService.getUserByEmail(email);
+                if (user == null)
+                        throw new UsernameNotFoundException(email + " user not found");
+
                 if (!user.isEnabled())
                         return MsgResponse.builder()
                                         .msg("Email not verified")
@@ -146,7 +148,7 @@ public class AuthService {
 
                 tokenService.verifyToken(user, String.valueOf(request.getOtp()), TokenType.RESET_PASSWORD_TOKEN);
                 user.setPassword(passwordEncoder.encode(request.getPassword()));
-                userRepository.save(user);
+                userService.saveUser(user);
                 return MsgResponse.builder()
                                 .msg("Password reset successfully")
                                 .build();

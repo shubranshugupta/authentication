@@ -22,8 +22,9 @@ public class UserService {
 
         public UserResposne getUserInfo(String token) {
                 String email = jwtService.getEmailFromToken(token);
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not exists."));
+                User user = getUserByEmail(email);
+                if (user == null)
+                        throw new UsernameNotFoundException(email + " user not exists.");
 
                 return UserResposne.builder()
                                 .email(user.getEmail())
@@ -34,8 +35,9 @@ public class UserService {
 
         public MsgResponse updateUserInfo(String token, UpdateUserRequest newInfo) {
                 String email = jwtService.getEmailFromToken(token);
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not exists."));
+                User user = getUserByEmail(email);
+                if (user == null)
+                        throw new UsernameNotFoundException(email + " user not exists.");
 
                 user.setFirstName(newInfo.getFirstName());
                 user.setLastName(newInfo.getLastName());
@@ -66,5 +68,13 @@ public class UserService {
                 return MsgResponse.builder()
                                 .msg("User deleted successfully.")
                                 .build();
+        }
+
+        public User getUserByEmail(String email) {
+                return userRepository.findByEmail(email).orElse(null);
+        }
+
+        public User saveUser(User user) {
+                return userRepository.save(user);
         }
 }

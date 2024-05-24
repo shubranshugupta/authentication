@@ -12,7 +12,6 @@ import com.portfoliopro.auth.entities.User;
 import com.portfoliopro.auth.exception.InvalidTokenException;
 import com.portfoliopro.auth.exception.TokenExpireException;
 import com.portfoliopro.auth.repository.RefereshTokenRepository;
-import com.portfoliopro.auth.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,16 +19,17 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RefereshTokenService {
     private final RefereshTokenRepository refereshTokenRepository;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @Value("${auth.token.refresh-expiration}")
     private long expireTime;
 
     public RefreshToken createRefereshToken(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException(email + " user not found"));
+        User user = userService.getUserByEmail(email);
+        if (user == null)
+            throw new UsernameNotFoundException(email + " user not exists.");
 
-        RefreshToken refereshToken = user.getRefreshToken();
+        RefreshToken refereshToken = refereshTokenRepository.findByUser(user).orElse(null);
         if (refereshToken == null) {
             refereshToken = RefreshToken.builder()
                     .refreshToken(UUID.randomUUID().toString())
