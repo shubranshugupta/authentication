@@ -10,6 +10,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.portfoliopro.auth.entities.token.impl.DeleteAccountOtp;
 import com.portfoliopro.auth.entities.token.impl.PasswordResetOtp;
 import com.portfoliopro.auth.entities.token.impl.VerificationToken;
@@ -36,6 +38,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "users")
+@JsonIgnoreProperties({ "authorities" })
 public class User implements UserDetails {
     @Id
     @GeneratedValue
@@ -71,15 +74,19 @@ public class User implements UserDetails {
     @Column(name = "is_enabled", nullable = false)
     private boolean isEnabled;
 
+    @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private RefreshToken refreshToken;
 
+    @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private VerificationToken verificationToken;
 
+    @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private PasswordResetOtp passwordResetOtp;
 
+    @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private DeleteAccountOtp deleteAccountOtp;
 
