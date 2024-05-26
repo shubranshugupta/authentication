@@ -2,6 +2,7 @@ package com.portfoliopro.auth.service;
 
 import java.io.Serializable;
 import java.util.LinkedHashMap;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -22,8 +23,11 @@ public class CacheService<K extends Serializable, V extends Serializable> {
         this.objectMapper = objectMapper;
     }
 
-    public void save(K key, V value) {
-        valueOperations.set(key, value);
+    public void save(K key, V value, Long expireTime) {
+        if (expireTime == null)
+            valueOperations.set(key, value);
+        else
+            valueOperations.set(key, value, expireTime, TimeUnit.MILLISECONDS);
     }
 
     @SuppressWarnings("unchecked")

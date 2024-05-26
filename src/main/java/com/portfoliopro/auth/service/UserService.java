@@ -82,7 +82,7 @@ public class UserService {
 
                 User user = userRepository.findByEmail(email).orElse(null);
                 if (user != null)
-                        cacheService.save(cacheKey, user);
+                        cacheService.save(cacheKey, user, null);
 
                 return user;
         }

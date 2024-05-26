@@ -30,7 +30,6 @@ public class RefereshTokenService {
         }
 
         if (refereshToken != null) {
-            deleteRefreshTokenFromCache(refereshToken.getRefreshToken());
             refereshTokenRepository.delete(refereshToken);
         }
 
@@ -48,7 +47,6 @@ public class RefereshTokenService {
         }
 
         if (refereshToken.getExpiryDate().isBefore(Instant.now())) {
-            deleteRefreshTokenFromCache(token);
             refereshTokenRepository.delete(refereshToken);
             throw new TokenExpireException(token + " Refresh token is expired",
                     new Throwable("Refresh token is expired"));
@@ -65,17 +63,17 @@ public class RefereshTokenService {
 
         RefreshToken refereshToken = refereshTokenRepository.findByRefreshToken(token).orElse(null);
         if (refereshToken != null) {
-            cacheService.save(cacheTokenKey, refereshToken);
+            cacheService.save(cacheTokenKey, refereshToken, expireTime);
         }
         return refereshToken;
     }
 
-    private void deleteRefreshTokenFromCache(String token) {
-        String cacheTokenKey = buildCacheKey(token);
-        if (cacheService.contains(cacheTokenKey)) {
-            cacheService.delete(cacheTokenKey);
-        }
-    }
+    // private void deleteRefreshTokenFromCache(String token) {
+    // String cacheTokenKey = buildCacheKey(token);
+    // if (cacheService.contains(cacheTokenKey)) {
+    // cacheService.delete(cacheTokenKey);
+    // }
+    // }
 
     public String buildCacheKey(String email) {
         return "refreshToken-" + email;
