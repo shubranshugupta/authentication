@@ -32,6 +32,11 @@ spring:
                     auth: true
                     starttls:
                         enable: true
+    
+    data:
+        redis:
+            host: localhost
+            port: 6379
 
 server:
     port: 8080
@@ -40,10 +45,9 @@ auth:
     base-url: http://localhost:${server.port}
     token:
         secret-key: ${JWT_SECRET_KEY}
-        # todo: change expiration time
-        jwt-expiration: 120000
-        refresh-expiration: 300000
-        token-expiration: 30000
+        jwt-expiration: 10800000
+        refresh-expiration: 604800000
+        token-expiration: 3600000
     
     cors:
         allowed-origins:

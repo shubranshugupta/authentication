@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.portfoliopro.auth.exception.handler.AuthExceptionHandler;
@@ -45,6 +46,13 @@ public class HttpExceptionHandler implements AuthExceptionHandler {
                     HttpStatusCode.valueOf(404),
                     e.getMessage());
             error.setProperty("msg", "Resource not found");
+        }
+
+        if (e instanceof MissingRequestCookieException) {
+            error = ProblemDetail.forStatusAndDetail(
+                    HttpStatusCode.valueOf(400),
+                    e.getMessage());
+            error.setProperty("msg", "Missing cookie");
         }
 
         if (nextHandler == null && error == null) {

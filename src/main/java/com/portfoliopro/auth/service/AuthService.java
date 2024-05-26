@@ -69,7 +69,7 @@ public class AuthService {
                                                 request.getPassword()));
 
                 String accessToken = jwtService.generateToken(user);
-                String refreshToken = refereshTokenService.createRefereshToken(request.getEmail())
+                String refreshToken = refereshTokenService.createRefereshToken(user)
                                 .getRefreshToken();
 
                 Cookie cookie = new Cookie("refreshToken", refreshToken);

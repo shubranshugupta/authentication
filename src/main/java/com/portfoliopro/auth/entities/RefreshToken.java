@@ -1,5 +1,6 @@
 package com.portfoliopro.auth.entities;
 
+import java.io.Serializable;
 import java.sql.Date;
 import java.time.Instant;
 
@@ -22,7 +23,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "refresh_tokens")
-public class RefreshToken {
+public class RefreshToken implements Serializable {
     @Id
     @GeneratedValue
     private Integer id;

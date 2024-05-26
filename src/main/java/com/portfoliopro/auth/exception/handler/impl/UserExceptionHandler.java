@@ -31,7 +31,7 @@ public class UserExceptionHandler implements AuthExceptionHandler {
 
         if (e instanceof UserAlreadyExistsException) {
             error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(400),
+                    HttpStatusCode.valueOf(409),
                     e.getMessage());
             error.setProperty("msg", "User already exists");
         }

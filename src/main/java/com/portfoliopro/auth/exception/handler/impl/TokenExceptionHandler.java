@@ -38,35 +38,35 @@ public class TokenExceptionHandler implements AuthExceptionHandler {
 
         if (e instanceof SignatureException) {
             error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(403),
+                    HttpStatusCode.valueOf(401),
                     e.getMessage());
             error.setProperty("msg", "Invalid Token signature");
         }
 
         if (e instanceof ExpiredJwtException) {
             error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(403),
+                    HttpStatusCode.valueOf(401),
                     e.getMessage());
             error.setProperty("msg", "Token has expired");
         }
 
         if (e instanceof TokenExpireException) {
             error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(403),
+                    HttpStatusCode.valueOf(401),
                     e.getMessage());
             error.setProperty("msg", "Token has expired");
         }
 
         if (e instanceof InvalidTokenException) {
             error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(403),
+                    HttpStatusCode.valueOf(401),
                     e.getMessage());
             error.setProperty("msg", "Invalid Token");
         }
 
         if (e instanceof TokenAlreadyExistsException) {
             error = ProblemDetail.forStatusAndDetail(
-                    HttpStatusCode.valueOf(403),
+                    HttpStatusCode.valueOf(409),
                     e.getMessage());
             error.setProperty("msg", "Token already exists");
         }
