@@ -2,6 +2,7 @@ package com.portfoliopro.auth.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,7 +14,7 @@ import com.portfoliopro.auth.dto.response.UserResposne;
 import com.portfoliopro.auth.service.UserService;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
@@ -28,18 +29,18 @@ public class UserController {
         return ResponseEntity.ok("Hello World");
     }
 
-    @GetMapping("/getInfo")
+    @GetMapping("/get-info")
     public ResponseEntity<UserResposne> getUserInfo(@RequestHeader("Authorization") String token) {
         return ResponseEntity.ok(userService.getUserInfo(token));
     }
 
-    @PostMapping("/updateInfo")
+    @PutMapping("/update-info")
     public ResponseEntity<MsgResponse> postMethodName(@RequestHeader("Authorization") String token,
             @RequestBody UpdateUserRequest newInfo) {
         return ResponseEntity.ok(userService.updateUserInfo(token, newInfo));
     }
 
-    @PostMapping("/delete")
+    @DeleteMapping("/delete")
     public ResponseEntity<MsgResponse> getMethodName(@RequestHeader("Authorization") String token,
             @Nullable @RequestBody DeleteAccountRequest request) {
         return ResponseEntity.ok(userService.deleteUser(token, request));

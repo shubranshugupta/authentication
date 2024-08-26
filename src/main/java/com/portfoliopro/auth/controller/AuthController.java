@@ -44,12 +44,12 @@ public class AuthController {
         return ResponseEntity.ok(authService.verifyRefreshToken(refreshToken));
     }
 
-    @GetMapping("/verifyEmail")
+    @GetMapping("/verify-email")
     public ResponseEntity<MsgResponse> verifyEmail(@RequestParam String email, @Nullable @RequestParam String token) {
         return ResponseEntity.ok(authService.verifyEmail(email, token));
     }
 
-    @PostMapping("/resetPassword")
+    @PostMapping("/reset-password")
     public ResponseEntity<MsgResponse> resetPassword(@RequestParam String email,
             @Nullable @RequestBody ResetPasswordRequest request) {
         return ResponseEntity.ok(authService.resetPassword(email, request));
