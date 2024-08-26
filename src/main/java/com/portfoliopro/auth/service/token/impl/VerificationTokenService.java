@@ -52,7 +52,7 @@ public class VerificationTokenService extends TokenTemplate<VerificationToken> {
 
     @Override
     protected EmailDTO getEmailDto(User user, VerificationToken newToken) {
-        String appUrl = getAppUrl() + "/auth/verifyEmail?token=" + newToken.getToken()
+        String appUrl = getAppUrl() + "/auth/verify-email?token=" + newToken.getToken()
                 + "&email=" + user.getEmail();
 
         return TokenEmailDTO.builder()
