@@ -51,7 +51,9 @@ MAIL_PASSWORD=gmailpassword
 ```
 
 NOTE: Replace the values with your database, JWT secret key, and email credentials.
+
 NOTE: If you are using Gmail, you need to enable "Less Secure Apps" in your Google account settings.
+
 NOTE: You can also define these properties as environment variables. You can also write the properties directly in the `application.yml` file. But for this you need to remove `import` statement from `application.yml` file.
 
 ```yaml
