@@ -34,8 +34,8 @@ This project is a comprehensive authentication system built using Spring Boot. I
 #### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/authentication-system.git
-cd authentication-system
+git clone https://github.com/shubranshugupta/authentication.git
+cd authentication
 ```
 
 #### Create `env.properties` File
