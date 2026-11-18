@@ -15,7 +15,9 @@ spring:
 
     jpa:
         hibernate:
-            ddl-auto: update
+            # Flyway owns the schema (src/main/resources/db/migration).
+            # Hibernate only checks that the entities match it.
+            ddl-auto: validate
         show-sql: false
         # No persistence context held open for the whole HTTP request. With it on,
         # entities loaded early in a request went stale after later writes, and
