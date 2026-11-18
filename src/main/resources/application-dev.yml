@@ -1,0 +1,19 @@
+# Local development. Active by default (see spring.profiles.default).
+# Values come from, highest priority first: environment variables, ./env.properties
+# at the project root (git-ignored), then the defaults below, which match docker-compose.yml.
+spring:
+    config:
+        import: optional:file:./env.properties
+
+    datasource:
+        url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3307}/${DB_DATABASE:auth}
+        username: ${DB_USER:auth}
+        password: ${DB_PASSWORD:auth}
+
+    data:
+        redis:
+            host: ${REDIS_HOST:localhost}
+            port: ${REDIS_PORT:6379}
+
+    jpa:
+        show-sql: true
