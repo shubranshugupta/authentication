@@ -71,8 +71,12 @@ public class User implements UserDetails {
     @Column(name = "role", nullable = false)
     private Role role;
 
+    // Named "enabled", not "isEnabled": Jackson 3 builds a cached User through the
+    // all-args constructor, matching parameter names to JSON properties. The getter
+    // isEnabled() writes the property as "enabled", so a parameter named "isEnabled"
+    // was never matched and reading a cached user failed.
     @Column(name = "is_enabled", nullable = false)
-    private boolean isEnabled;
+    private boolean enabled;
 
     @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
@@ -122,6 +126,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isEnabled;
+        return enabled;
     }
 }

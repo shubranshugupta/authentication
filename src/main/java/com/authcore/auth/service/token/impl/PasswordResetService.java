@@ -1,6 +1,7 @@
 package com.authcore.auth.service.token.impl;
 
 import java.security.SecureRandom;
+import java.util.List;
 
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,7 +43,7 @@ public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
 
     @Override
     protected void deleteToken(PasswordResetOtp origToken) {
-        otpRepository.delete(origToken);
+        otpRepository.deleteAllByIdInBatch(List.of(origToken.getId()));
     }
 
     @Override

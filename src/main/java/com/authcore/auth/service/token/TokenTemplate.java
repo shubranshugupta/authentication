@@ -1,6 +1,7 @@
 package com.authcore.auth.service.token;
 
 import java.time.Instant;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEvent;
@@ -33,8 +34,12 @@ public abstract class TokenTemplate<T extends Token> {
         if (token != null && token.getExpiryDate().isAfter(Instant.now()))
             throw new TokenAlreadyExistsException("Token already exists");
 
+        // Tokens are deleted by id with a bulk query (here and in the subclasses and
+        // RefereshTokenService). Hibernate 7 rejects delete(entity) for them: loading
+        // the token also loads its User, whose inverse @OneToOne would still point at
+        // the deleted token. Phase 4 (A1) replaces these token tables.
         if (token != null)
-            tokenRepository.delete(token);
+            tokenRepository.deleteAllByIdInBatch(List.of(token.getId()));
 
         token = createNewToken();
         token.setToken(generateRandomTokenID());
@@ -53,7 +58,7 @@ public abstract class TokenTemplate<T extends Token> {
         }
 
         if (origToken.getExpiryDate().isBefore(Instant.now())) {
-            tokenRepository.delete(origToken);
+            tokenRepository.deleteAllByIdInBatch(List.of(origToken.getId()));
             throw new TokenExpireException(token + " Token is expired");
         }
 

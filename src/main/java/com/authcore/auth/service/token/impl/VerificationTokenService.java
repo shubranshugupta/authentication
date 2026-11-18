@@ -1,5 +1,6 @@
 package com.authcore.auth.service.token.impl;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEvent;
@@ -42,7 +43,7 @@ public class VerificationTokenService extends TokenTemplate<VerificationToken> {
 
     @Override
     protected void deleteToken(VerificationToken origToken) {
-        verificationTokenRepository.delete(origToken);
+        verificationTokenRepository.deleteAllByIdInBatch(List.of(origToken.getId()));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.authcore.auth.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -30,7 +31,7 @@ public class RefereshTokenService {
         }
 
         if (refereshToken != null) {
-            refereshTokenRepository.delete(refereshToken);
+            refereshTokenRepository.deleteAllByIdInBatch(List.of(refereshToken.getId()));
         }
 
         refereshToken = RefreshToken.builder().refreshToken(UUID.randomUUID().toString())
@@ -47,7 +48,7 @@ public class RefereshTokenService {
         }
 
         if (refereshToken.getExpiryDate().isBefore(Instant.now())) {
-            refereshTokenRepository.delete(refereshToken);
+            refereshTokenRepository.deleteAllByIdInBatch(List.of(refereshToken.getId()));
             throw new TokenExpireException(token + " Refresh token is expired",
                     new Throwable("Refresh token is expired"));
         }

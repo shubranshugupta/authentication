@@ -19,7 +19,10 @@ spring:
         hibernate:
             ddl-auto: update
         show-sql: true
-        database-platform: org.hibernate.dialect.MySQL8Dialect
+        # No persistence context held open for the whole HTTP request. With it on,
+        # entities loaded early in a request went stale after later writes, and
+        # Hibernate 7 failed when saving them (e.g. email verification returned 500).
+        open-in-view: false
     
     mail:
         host: smtp.gmail.com

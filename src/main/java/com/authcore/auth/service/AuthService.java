@@ -50,7 +50,7 @@ public class AuthService {
                                 .email(request.getEmail())
                                 .password(passwordEncoder.encode(request.getPassword()))
                                 .role(Role.USER)
-                                .isEnabled(false)
+                                .enabled(false)
                                 .build();
 
                 userService.saveUser(user);
