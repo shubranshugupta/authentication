@@ -9,11 +9,11 @@
 		<relativePath/>
 		<!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.portfoliopro</groupId>
+	<groupId>com.authcore</groupId>
 	<artifactId>auth</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>auth</name>
-	<description>This is the authentication module for the portfoliopro project</description>
+	<description>AuthCore authentication service</description>
 	<properties>
 		<java.version>17</java.version>
 		<spring-cloud.version>2023.0.1</spring-cloud.version>

@@ -1,0 +1,5 @@
+package com.authcore.auth.utils;
+
+public interface EmailMessageBodyBuilder<T> extends MessageBodyBuilder<T> {
+    public String getMessage(T data);
+}
