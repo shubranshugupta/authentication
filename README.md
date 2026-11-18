@@ -18,16 +18,15 @@ This project is a comprehensive authentication system built using Spring Boot. I
 - Spring Security: Used for implementing security features like JWT, OAuth, and role-based access control.
 - Redis: Used for caching and storing session-related data.
 - Thymeleaf: Template engine for processing email templates.
-- MySQL/PostgreSQL: Relational database for storing user information and tokens.
+- MySQL: Relational database for storing user information and tokens, with Flyway migrations.
 
 ## Getting Started
 
 ### Prerequisites
 
-1. Java 11 or higher
-2. Maven
-3. MySQL/PostgreSQL
-4. Redis
+1. Java 21 or higher
+2. Docker (runs MySQL and Redis for development, and for the integration tests)
+3. Maven is optional: the project includes the Maven wrapper (`./mvnw`, or `mvnw.cmd` on Windows)
 
 ### Installation
 
@@ -38,45 +37,55 @@ git clone https://github.com/shubranshugupta/authentication.git
 cd authentication
 ```
 
-#### Create `env.properties` File
+#### Create the `env.properties` File
 
-Create a new file named `env.properties` in the `src/main/resources` directory and add `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_USERNAME`, and `MAIL_PASSWORD` properties.You can use the following template:
+Copy the template to the project root. `env.properties` is git-ignored, so your secrets stay out of the repository.
 
-```properties
-DB_USER=user
-DB_PASSWORD=password
-JWT_SECRET_KEY=key
-MAIL_USERNAME=abc@gmail.com
-MAIL_PASSWORD=gmailpassword
+```bash
+cp env.properties.example env.properties
 ```
 
-NOTE: Replace the values with your database, JWT secret key, and email credentials.
+Then fill in:
 
-NOTE: If you are using Gmail, you need to enable "Less Secure Apps" in your Google account settings.
+- `JWT_SECRET_KEY`: a base64 key of at least 32 bytes. Generate one with `openssl rand -base64 48`.
+- `MAIL_USERNAME` and `MAIL_PASSWORD`: for Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your account password.
 
-NOTE: You can also define these properties as environment variables. You can also write the properties directly in the `application.yml` file. But for this you need to remove `import` statement from `application.yml` file.
+The database and Redis defaults already match `docker-compose.yml`. Any setting can also be given as an environment variable, which takes priority over the file.
 
-```yaml
-spring:
-  config:
-    import: file:src\main\resources\env.properties
+#### Start MySQL and Redis
+
+```bash
+docker compose --env-file env.properties up -d
 ```
 
-#### Configure Database
-
-Create a new database in MySQL/PostgreSQL and update the  `application.yml` file with your database credentials.
-
-#### Set Up Redis
-
-Ensure that Redis is running on your machine and is accessible by the application. You can update the Redis configuration in the `application.yml` file if needed.
+MySQL is published on port `3307` (not 3306), so it doesn't clash with a MySQL server already installed locally. Both services listen on `127.0.0.1` only.
 
 #### Run the Application
 
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 NOTE: The application will start at `http://localhost:8080`.
+
+### Configuration Profiles
+
+| Profile | How it's selected | Settings come from |
+|---|---|---|
+| `dev` | the default | environment variables, then `./env.properties`, then defaults matching `docker-compose.yml`. SQL logging is on. |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod` | environment variables only. There are no defaults for hosts or credentials: set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_USERNAME`, `MAIL_PASSWORD` and `APP_BASE_URL`. |
+
+### Database Migrations
+
+The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V2__...sql`, `V3__...sql`, ...). Never edit a migration that has already run.
+
+### Running the Tests
+
+```bash
+./mvnw verify
+```
+
+The integration tests start real MySQL and Redis containers with [Testcontainers](https://testcontainers.com), so Docker must be running. They don't need `env.properties`, and they never send real emails.
 
 ## API Endpoints
 

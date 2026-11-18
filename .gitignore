@@ -1,8 +1,47 @@
 HELP.md
+
+### Java ###
+# Compiled classes and packaged archives
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+# JVM crash logs and heap dumps
+hs_err_pid*
+replay_pid*
+*.hprof
+.attach_pid*
+# Other Java tools
+*.ctxt
+.mtj.tmp/
+
+### Maven ###
 target/
-!.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.flattened-pom.xml
+# The Maven wrapper jar must stay tracked. This line has to come after "*.jar".
+!.mvn/wrapper/maven-wrapper.jar
+
+### Gradle (in case the build ever moves to Gradle) ###
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+### Build output folders of IDEs ###
+out/
+bin/
 
 ### STS ###
 .apt_generated
@@ -35,4 +74,34 @@ build/
 
 
 ### Secret Files ###
+# Local config with real credentials. The *.example templates stay tracked.
 env.properties
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.properties
+# Keys and certificates (e.g. future RS256 JWT signing keys, TLS certs)
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+### Personal notes (not shared in the repository) ###
+IMPROVEMENTS.md
+PHASE-*.md
+
+### Logs and runtime files ###
+*.log
+logs/
+*.pid
+
+### OS files ###
+.DS_Store
+Thumbs.db
+desktop.ini
+
+### Claude Code local settings ###
+.claude/settings.local.json
