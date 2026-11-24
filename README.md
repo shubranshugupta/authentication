@@ -10,13 +10,13 @@ This project is a comprehensive authentication system built using Spring Boot. I
 - Password Reset: Allows users to reset their password via email.
 - Email Notifications: Sends emails for new user registrations, password resets, and other significant events.
 - Logging: Comprehensive logging to monitor the application and track issues.
-- Caching: Uses Redis for caching and storing session-related data.
+- Caching: Uses Redis to cache refresh tokens (ids and expiry only, never users or passwords).
 
 ## Technologies Used
 
 - Spring Boot: Main framework used for developing the application.
 - Spring Security: Used for implementing security features like JWT, OAuth, and role-based access control.
-- Redis: Used for caching and storing session-related data.
+- Redis: Used for caching refresh tokens.
 - Thymeleaf: Template engine for processing email templates.
 - MySQL: Relational database for storing user information and tokens, with Flyway migrations.
 
@@ -76,7 +76,7 @@ NOTE: The application will start at `http://localhost:8080`.
 
 ### Database Migrations
 
-The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V3__...sql`, `V4__...sql`, ...). Never edit a migration that has already run.
+The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V4__...sql`, `V5__...sql`, ...). Never edit a migration that has already run.
 
 ### Running the Tests
 
@@ -85,6 +85,20 @@ The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Mi
 ```
 
 The integration tests start real MySQL and Redis containers with [Testcontainers](https://testcontainers.com), so Docker must be running. They don't need `env.properties`, and they never send real emails.
+
+## Project Structure
+
+Packages under `com.authcore.auth` are grouped by feature:
+
+| Package | What's in it |
+|---|---|
+| `auth` | registration, login, email verification, password reset |
+| `user` | users, profile, account deletion, admin API |
+| `token` | one-time tokens and codes sent by email |
+| `session` | refresh tokens |
+| `security` | Spring Security setup, access tokens (JWT) |
+| `notification` | emails |
+| `common` | settings, error handling, validation, Redis |
 
 ## API Endpoints
 
@@ -96,7 +110,6 @@ The integration tests start real MySQL and Redis containers with [Testcontainers
 6. Get User Profile: `GET /user/get-info`
 7. Update User Profile: `PUT /user/update-info`
 8. Delete User: `DELETE /user/delete`
-9. Hello World: `GET /user/hello`
 
 ### Input Rules
 
@@ -124,7 +137,28 @@ Removing an email from the list doesn't demote anyone.
 
 ## Error Handling
 
-The system is designed to handle and log errors efficiently. Custom exceptions are used to manage different types of errors, and meaningful messages are returned to the client.
+Every error is a `ProblemDetail` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)) with two extra properties: `code`, which never changes, and `msg`, a short text. Clients should decide by `code`.
+
+```json
+{
+  "title": "Unauthorized",
+  "status": 401,
+  "detail": "The access token has expired.",
+  "instance": "/user/get-info",
+  "code": "TOKEN_EXPIRED",
+  "msg": "Token has expired"
+}
+```
+
+| Status | Codes |
+|---|---|
+| 400 | `INVALID_INPUT` (with `errors`), `MALFORMED_BODY`, `MISSING_PARAMETER`, `INVALID_PARAMETER`, `MISSING_COOKIE`, `BAD_REQUEST` |
+| 401 | `AUTHENTICATION_REQUIRED` (no token), `INVALID_TOKEN`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` |
+| 403 | `ACCOUNT_DISABLED` (email not verified), `ACCESS_DENIED` |
+| 404 | `NOT_FOUND`, `USER_NOT_FOUND` |
+| 405, 406, 415 | `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
+| 409 | `USER_ALREADY_EXISTS`, `TOKEN_ALREADY_EXISTS` (a code was already sent) |
+| 500 | `INTERNAL_ERROR`. The details are only in the server log. |
 
 ## Contributing
 
