@@ -17,6 +17,7 @@ import com.authcore.auth.support.IntegrationTest;
 /** Profile update, password reset, and account deletion. */
 class AccountManagementFlowTests extends IntegrationTest {
     private static final String NEW_PASSWORD = "N3w-Str0ng-Passw0rd!";
+    private static final String RESET_REQUESTED = "If an account with this email exists, a password reset email has been sent.";
 
     // ---- profile -------------------------------------------------------------------
 
@@ -50,7 +51,7 @@ class AccountManagementFlowTests extends IntegrationTest {
 
         requestPasswordReset(email)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value("Password reset email sent"));
+                .andExpect(jsonPath("$.msg").value(RESET_REQUESTED));
         String otp = passwordResetOtp(email);
         assertThat(htmlBody(awaitEmail(email, "Password Reset"))).contains(otp);
 
@@ -75,14 +76,22 @@ class AccountManagementFlowTests extends IntegrationTest {
         login(email, PASSWORD).andExpect(status().isOk());
     }
 
-    /** Current behaviour, recorded on purpose. H3 replaces this with a resend cooldown. */
+    /**
+     * A second request while a code is active gets the usual answer (it used to be 409,
+     * which revealed the account, H2) and keeps the first code. Getting a new code still
+     * means waiting for the old one to expire; H3 (Phase 4) adds a short resend cooldown.
+     */
     @Test
-    void requestingASecondPasswordResetWhileOneIsActiveReturns409() throws Exception {
+    void aSecondPasswordResetRequestGetsTheSameAnswerAndKeepsTheFirstCode() throws Exception {
         String email = uniqueEmail();
         registerVerifiedUserAndLogin(email);
         requestPasswordReset(email).andExpect(status().isOk());
+        String firstOtp = passwordResetOtp(email);
 
-        requestPasswordReset(email).andExpect(status().isConflict());
+        requestPasswordReset(email)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.msg").value(RESET_REQUESTED));
+        assertThat(passwordResetOtp(email)).isEqualTo(firstOtp);
     }
 
     @Test
@@ -90,9 +99,10 @@ class AccountManagementFlowTests extends IntegrationTest {
         String email = uniqueEmail();
         register(email, PASSWORD).andExpect(status().isOk());
 
+        // Same answer as for a verified account (it used to say "Email not verified", H2).
         requestPasswordReset(email)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value("Email not verified"));
+                .andExpect(jsonPath("$.msg").value(RESET_REQUESTED));
         assertThat(passwordResetRepository.findByUser(user(email))).isEmpty();
     }
 
@@ -114,7 +124,7 @@ class AccountManagementFlowTests extends IntegrationTest {
                 .andExpect(jsonPath("$.msg").value("User deleted successfully."));
 
         assertThat(userRepository.findByEmail(email)).isEmpty();
-        login(email, PASSWORD).andExpect(status().isNotFound());
+        login(email, PASSWORD).andExpect(status().isUnauthorized());
     }
 
     @Test

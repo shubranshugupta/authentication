@@ -1,4 +1,4 @@
-# Local development services: MySQL and Redis.
+# Local development services: MySQL, Redis and Mailpit.
 #
 # Start them with the same settings the app reads:
 #   docker compose --env-file env.properties up -d
@@ -33,6 +33,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Fake mail server: the app's emails land here instead of real inboxes.
+  # Read them at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:1025:1025"   # SMTP: the app sends here
+      - "127.0.0.1:8025:8025"   # web inbox
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1        # accept any username/password (the app logs in to SMTP)
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1    # allow that login without TLS (local only)
 
 volumes:
   mysql-data:

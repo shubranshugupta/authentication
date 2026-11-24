@@ -24,6 +24,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.Cookie;
 
@@ -52,6 +53,11 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
                 .contains(verificationToken(email))
                 .contains("cid:authcoreLogo")
                 .contains("AuthCore");
+
+        // The sender comes from auth.mail.from / from-name, not from the SMTP login.
+        InternetAddress from = (InternetAddress) verificationEmail.getFrom()[0];
+        assertThat(from.getAddress()).isEqualTo("noreply@authcore.test");
+        assertThat(from.getPersonal()).isEqualTo("AuthCore");
     }
 
     @Test
@@ -82,9 +88,9 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
         assertThat(user(email).isEnabled()).isTrue();
         assertThat(verificationTokenRepository.findByUser(user(email))).isEmpty();
 
-        verifyEmail(email, "any-token")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value("Email already verified"));
+        // Using the link again: the same 401 as any invalid link. It used to answer
+        // "Email already verified", which told anyone whether an email was verified (H2).
+        verifyEmail(email, "any-token").andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -100,15 +106,23 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
     // ---- login ---------------------------------------------------------------------
 
     @Test
-    void loginReturnsAnAccessTokenAndAnHttpOnlyRefreshCookie() throws Exception {
+    void loginReturnsAnAccessTokenAndARefreshCookieBrowsersSendBack() throws Exception {
         String email = uniqueEmail();
         registerVerifiedUserAndLogin(email);
 
-        login(email, PASSWORD)
+        String setCookie = login(email, PASSWORD)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(cookie().exists("refreshToken"))
-                .andExpect(cookie().httpOnly("refreshToken", true));
+                .andExpect(cookie().httpOnly("refreshToken", true))
+                .andExpect(cookie().secure("refreshToken", true))
+                .andExpect(cookie().sameSite("refreshToken", "Strict"))
+                .andExpect(cookie().maxAge("refreshToken", 604800))
+                .andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE);
+
+        // A path, not a URL (C5): with "Path=http://localhost:8080/auth" browsers never
+        // sent the cookie back to /auth/refresh.
+        assertThat(setCookie).contains("Path=/auth;").doesNotContain("http");
     }
 
     @Test
@@ -119,10 +133,10 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
         login(email, "wrong-password").andExpect(status().isUnauthorized());
     }
 
-    /** Current behaviour, recorded on purpose. H2 changes this to 401 so emails can't be probed. */
+    /** H2: used to return 404, which told anyone the email wasn't registered. */
     @Test
-    void loginWithAnUnknownEmailReturns404() throws Exception {
-        login(uniqueEmail(), PASSWORD).andExpect(status().isNotFound());
+    void loginWithAnUnknownEmailReturns401() throws Exception {
+        login(uniqueEmail(), PASSWORD).andExpect(status().isUnauthorized());
     }
 
     // ---- refresh -------------------------------------------------------------------
@@ -198,11 +212,15 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    /** Current behaviour, recorded on purpose. A2/M6 change this to 401. */
+    /**
+     * Current behaviour, recorded on purpose: still 500 (A2/M6 change this to 401 in
+     * Phase 3). Since H2 the response no longer includes the internal error message.
+     */
     @Test
-    void malformedTokenReturns500() throws Exception {
+    void malformedTokenReturns500WithoutInternalDetails() throws Exception {
         mvc.perform(get("/user/get-info").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value("An unexpected error occurred."));
     }
 
     private static String token(String email, SecretKey key, Instant expiresAt) {

@@ -1,5 +1,6 @@
 package com.authcore.auth.dto.request;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,5 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class DeleteAccountRequest {
-    private long otp;
+    // Long, not long: a missing OTP is rejected instead of silently becoming 0.
+    @NotNull
+    private Long otp;
 }

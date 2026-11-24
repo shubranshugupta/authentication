@@ -13,6 +13,7 @@ import com.authcore.auth.dto.response.MsgResponse;
 import com.authcore.auth.dto.response.UserResposne;
 import com.authcore.auth.service.UserService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,13 +37,13 @@ public class UserController {
 
     @PutMapping("/update-info")
     public ResponseEntity<MsgResponse> postMethodName(@RequestHeader("Authorization") String token,
-            @RequestBody UpdateUserRequest newInfo) {
+            @Valid @RequestBody UpdateUserRequest newInfo) {
         return ResponseEntity.ok(userService.updateUserInfo(token, newInfo));
     }
 
     @DeleteMapping("/delete")
     public ResponseEntity<MsgResponse> getMethodName(@RequestHeader("Authorization") String token,
-            @Nullable @RequestBody DeleteAccountRequest request) {
+            @Nullable @Valid @RequestBody DeleteAccountRequest request) {
         return ResponseEntity.ok(userService.deleteUser(token, request));
     }
 

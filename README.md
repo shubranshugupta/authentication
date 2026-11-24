@@ -25,7 +25,7 @@ This project is a comprehensive authentication system built using Spring Boot. I
 ### Prerequisites
 
 1. Java 21 or higher
-2. Docker (runs MySQL and Redis for development, and for the integration tests)
+2. Docker (runs MySQL, Redis and Mailpit for development, and the integration tests)
 3. Maven is optional: the project includes the Maven wrapper (`./mvnw`, or `mvnw.cmd` on Windows)
 
 ### Installation
@@ -45,20 +45,19 @@ Copy the template to the project root. `env.properties` is git-ignored, so your 
 cp env.properties.example env.properties
 ```
 
-Then fill in:
+Then fill in `JWT_SECRET_KEY`: a base64 key of at least 32 bytes. Generate one with `openssl rand -base64 48`.
 
-- `JWT_SECRET_KEY`: a base64 key of at least 32 bytes. Generate one with `openssl rand -base64 48`.
-- `MAIL_USERNAME` and `MAIL_PASSWORD`: for Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your account password.
+The database, Redis and mail defaults already match `docker-compose.yml`. Any setting can also be given as an environment variable, which takes priority over the file.
 
-The database and Redis defaults already match `docker-compose.yml`. Any setting can also be given as an environment variable, which takes priority over the file.
-
-#### Start MySQL and Redis
+#### Start MySQL, Redis and Mailpit
 
 ```bash
 docker compose --env-file env.properties up -d
 ```
 
-MySQL is published on port `3307` (not 3306), so it doesn't clash with a MySQL server already installed locally. Both services listen on `127.0.0.1` only.
+MySQL is published on port `3307` (not 3306), so it doesn't clash with a MySQL server already installed locally. All services listen on `127.0.0.1` only.
+
+[Mailpit](https://mailpit.axllent.org) is a fake mail server: in development, every email the app sends (verification links, OTPs) lands in its inbox at **http://localhost:8025** instead of a real mailbox. To send real emails from development instead, set `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` and `MAIL_FROM` (for Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your account password).
 
 #### Run the Application
 
@@ -73,11 +72,11 @@ NOTE: The application will start at `http://localhost:8080`.
 | Profile | How it's selected | Settings come from |
 |---|---|---|
 | `dev` | the default | environment variables, then `./env.properties`, then defaults matching `docker-compose.yml`. SQL logging is on. |
-| `prod` | `SPRING_PROFILES_ACTIVE=prod` | environment variables only. There are no defaults for hosts or credentials: set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_USERNAME`, `MAIL_PASSWORD` and `APP_BASE_URL`. |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod` | environment variables only. There are no defaults for hosts or credentials: set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `APP_BASE_URL`. |
 
 ### Database Migrations
 
-The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V2__...sql`, `V3__...sql`, ...). Never edit a migration that has already run.
+The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V3__...sql`, `V4__...sql`, ...). Never edit a migration that has already run.
 
 ### Running the Tests
 
@@ -98,6 +97,30 @@ The integration tests start real MySQL and Redis containers with [Testcontainers
 7. Update User Profile: `PUT /user/update-info`
 8. Delete User: `DELETE /user/delete`
 9. Hello World: `GET /user/hello`
+
+### Input Rules
+
+- **Passwords** (registration and reset): at least 12 characters and at most 72 bytes. bcrypt ignores anything after 72 bytes; accented letters and emoji take 2–4 bytes each.
+- **Emails** are trimmed and lowercased, so `Jane@Example.com` and `jane@example.com` are the same account.
+- **Invalid input** returns `400` with an `errors` object that maps each field to its problem, for example `{"password": "must be at least 12 characters"}`.
+
+### Admin Endpoints
+
+These need an access token of a user with the `ADMIN` role (otherwise `403`; without a token, `401`).
+
+1. List users: `GET /api/v1/admin/users?page=0&size=20` (zero-based pages, at most 100 per page)
+2. Get one user: `GET /api/v1/admin/users/{id}`
+
+The responses never include password hashes or tokens.
+
+#### Making someone an admin
+
+The API never grants the `ADMIN` role. List the admins' emails in the `AUTH_ADMIN_EMAILS` setting (comma-separated):
+
+- a listed email registers as `ADMIN`;
+- existing users with a listed email are promoted when the application starts.
+
+Removing an email from the list doesn't demote anyone.
 
 ## Error Handling
 

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.entities.RefreshToken;
@@ -36,21 +37,24 @@ public class RefereshTokenService {
 
         refereshToken = RefreshToken.builder().refreshToken(UUID.randomUUID().toString())
                 .expiryDate(Instant.now().plusMillis(expireTime)).user(user).build();
-        refereshToken = refereshTokenRepository.save(refereshToken);
-        return refereshToken;
+        try {
+            return refereshTokenRepository.save(refereshToken);
+        } catch (DataIntegrityViolationException e) {
+            // Another login of this user created the token at the same moment: share it.
+            return refereshTokenRepository.findByUser(user).orElseThrow(() -> e);
+        }
     }
 
     public RefreshToken verifyRefereshToken(String token) {
         RefreshToken refereshToken = getRefereshTokenFromToken(token);
         if (refereshToken == null) {
-            throw new InvalidTokenException(token + " is invalid refresh token.",
-                    new Throwable("Invalid refresh token"));
+            // Never echo the token: error responses and logs must not contain it (H2).
+            throw new InvalidTokenException("Invalid refresh token");
         }
 
         if (refereshToken.getExpiryDate().isBefore(Instant.now())) {
             refereshTokenRepository.deleteAllByIdInBatch(List.of(refereshToken.getId()));
-            throw new TokenExpireException(token + " Refresh token is expired",
-                    new Throwable("Refresh token is expired"));
+            throw new TokenExpireException("Refresh token has expired");
         }
 
         return refereshToken;

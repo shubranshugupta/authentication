@@ -3,6 +3,7 @@ package com.authcore.auth.config;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -34,6 +35,10 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf
                 .disable())
+                // Uses the corsConfigurationSource bean below. CORS must run inside the
+                // security chain, so browser preflight (OPTIONS) requests aren't
+                // rejected as unauthenticated.
+                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/auth/**")
                         .permitAll()
@@ -52,9 +57,14 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(authConfigProperties.getCors().getAllowedOrigin());
+        config.setAllowedOrigins(authConfigProperties.getCors().getAllowedOrigins());
         config.setAllowedMethods(authConfigProperties.getCors().getAllowedMethods());
         config.setAllowedHeaders(authConfigProperties.getCors().getAllowedHeaders());
+        // Lets the frontend send and receive the refresh-token cookie
+        // (fetch with credentials: "include"). Requires exact origins, never "*".
+        config.setAllowCredentials(true);
+        // Browsers may cache a preflight answer for an hour.
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

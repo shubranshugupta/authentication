@@ -3,12 +3,12 @@
 # settings are needed here, and nothing is read from ./env.properties.
 auth:
     base-url: http://localhost:8080
+    # Registers as ADMIN (AdminUserTests uses it once).
+    admin-emails: first-admin@authcore.test
     token:
         # Test-only key (base64 of "test-only-jwt-signing-key-for-authcore-integration-tests").
         secret-key: dGVzdC1vbmx5LWp3dC1zaWduaW5nLWtleS1mb3ItYXV0aGNvcmUtaW50ZWdyYXRpb24tdGVzdHM=
-
-spring:
     mail:
-        # JavaMailSender is replaced by a mock in the tests; nothing is sent.
-        username: noreply@authcore.test
-        password: unused
+        # JavaMailSender is a mock in most tests (nothing is sent); MailDeliveryTests
+        # sends for real, to a Mailpit container.
+        from: noreply@authcore.test
