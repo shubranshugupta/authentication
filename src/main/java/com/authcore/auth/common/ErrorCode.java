@@ -29,6 +29,9 @@ public enum ErrorCode {
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "User is not authorized to access this resource"),
     TOKEN_ALREADY_EXISTS(HttpStatus.CONFLICT, "Token already exists"),
 
+    // codes and links from emails (400, not 401: the login is fine, so a client must not refresh it)
+    INVALID_CODE(HttpStatus.BAD_REQUEST, "Invalid or expired code"),
+
     // users
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "User already exists"),

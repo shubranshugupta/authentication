@@ -86,14 +86,19 @@ class ValidationTests extends IntegrationTest {
         mvc.perform(post("/auth/reset-password").param("email", email)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"otp": %s, "password": "short"}
+                        {"otp": "%s", "password": "short"}
                         """.formatted(otp)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.password").value("must be at least 12 characters"));
 
         // Rejected before the OTP was checked, so it can still be used.
-        assertThat(passwordResetOtp(email)).isEqualTo(otp);
         login(email, PASSWORD).andExpect(status().isOk());
+        mvc.perform(post("/auth/reset-password").param("email", email)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"otp": "%s", "password": "Twelve-char1"}
+                        """.formatted(otp)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -105,6 +110,19 @@ class ValidationTests extends IntegrationTest {
                         """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.otp").exists());
+    }
+
+    /** Answered before any account is looked up, and without counting a guess. */
+    @Test
+    void passwordResetRejectsAnOtpThatIsNot8Digits() throws Exception {
+        for (String otp : new String[] { "\"1234567\"", "\"123456789\"", "\"1234567a\"", "\"\"", "1234", "null", "\"١٢٣٤٥٦٧٨\"" })
+            mvc.perform(post("/auth/reset-password").param("email", uniqueEmail())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {"otp": %s, "password": "Twelve-char1"}
+                            """.formatted(otp)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors.otp").exists());
     }
 
     @Test
@@ -162,7 +180,7 @@ class ValidationTests extends IntegrationTest {
         mvc.perform(post("/auth/reset-password").param("email", padded)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"otp": %s, "password": "N3w-Str0ng-Passw0rd!"}
+                        {"otp": "%s", "password": "N3w-Str0ng-Passw0rd!"}
                         """.formatted(passwordResetOtp(email))))
                 .andExpect(status().isOk());
         login(email, "N3w-Str0ng-Passw0rd!").andExpect(status().isOk());

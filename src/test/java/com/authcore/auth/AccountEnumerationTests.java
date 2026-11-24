@@ -65,8 +65,8 @@ class AccountEnumerationTests extends IntegrationTest {
         assertSameAnswer(forVerified, forUnknown, 200);
         assertSameAnswer(forVerified, whileOneIsActive, 200);
         // Only the verified account actually got a code.
-        assertThat(passwordResetRepository.findByUser(user(verified))).isPresent();
-        assertThat(passwordResetRepository.findByUser(user(unverified))).isEmpty();
+        awaitEmail(verified, "Password Reset");
+        assertThat(sentEmails(unverified, "Password Reset")).isEmpty();
     }
 
     @Test
@@ -80,13 +80,13 @@ class AccountEnumerationTests extends IntegrationTest {
         register(unverified, PASSWORD);
 
         MvcResult wrongCode = confirmPasswordReset(withCode, wrongOtp(passwordResetOtp(withCode))).andReturn();
-        MvcResult noActiveCode = confirmPasswordReset(withoutCode, "123456").andReturn();
-        MvcResult forUnverified = confirmPasswordReset(unverified, "123456").andReturn();
-        MvcResult unknownEmail = confirmPasswordReset(uniqueEmail(), "123456").andReturn();
+        MvcResult noActiveCode = confirmPasswordReset(withoutCode, "12345678").andReturn();
+        MvcResult forUnverified = confirmPasswordReset(unverified, "12345678").andReturn();
+        MvcResult unknownEmail = confirmPasswordReset(uniqueEmail(), "12345678").andReturn();
 
-        assertSameAnswer(wrongCode, noActiveCode, 401);
-        assertSameAnswer(wrongCode, forUnverified, 401);
-        assertSameAnswer(wrongCode, unknownEmail, 401);
+        assertSameAnswer(wrongCode, noActiveCode, 400);
+        assertSameAnswer(wrongCode, forUnverified, 400);
+        assertSameAnswer(wrongCode, unknownEmail, 400);
     }
 
     // ---- email verification --------------------------------------------------------
@@ -117,8 +117,8 @@ class AccountEnumerationTests extends IntegrationTest {
         MvcResult unknown = verifyEmail(uniqueEmail(), "some-token").andReturn();
         MvcResult alreadyVerified = verifyEmail(verified, "some-token").andReturn();
 
-        assertSameAnswer(wrongToken, unknown, 401);
-        assertSameAnswer(wrongToken, alreadyVerified, 401);
+        assertSameAnswer(wrongToken, unknown, 400);
+        assertSameAnswer(wrongToken, alreadyVerified, 400);
     }
 
     // ---- no tokens in error responses ----------------------------------------------
@@ -134,7 +134,7 @@ class AccountEnumerationTests extends IntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
         String verifyBody = verifyEmail(unverified, fakeLinkToken)
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isBadRequest())
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(refreshBody).doesNotContain(fakeRefreshToken);
@@ -164,7 +164,7 @@ class AccountEnumerationTests extends IntegrationTest {
         return mvc.perform(post("/auth/reset-password").param("email", email)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"otp": %s, "password": "N3w-Str0ng-Passw0rd!"}
+                        {"otp": "%s", "password": "N3w-Str0ng-Passw0rd!"}
                         """.formatted(otp)));
     }
 

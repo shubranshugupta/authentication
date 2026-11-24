@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
-import com.authcore.auth.token.InvalidTokenException;
 import com.authcore.auth.user.UserRepository;
 
 import jakarta.servlet.FilterChain;

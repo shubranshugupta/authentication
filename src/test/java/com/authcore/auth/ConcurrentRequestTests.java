@@ -8,16 +8,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 
 import com.authcore.auth.support.IntegrationTest;
 
@@ -28,9 +29,6 @@ import jakarta.servlet.http.Cookie;
  * They all used to insert the same row, and all but one got 500.
  */
 class ConcurrentRequestTests extends IntegrationTest {
-    @Autowired
-    private JdbcTemplate jdbc;
-
     private static final int REQUESTS = 8;
     /** Whether the requests really overlap is up to the scheduler, so try a few times. */
     private static final int ROUNDS = 3;
@@ -80,25 +78,91 @@ class ConcurrentRequestTests extends IntegrationTest {
 
             assertThat(allAtOnce(() -> mvc.perform(post("/auth/reset-password").param("email", email))
                     .andReturn().getResponse().getStatus())).containsOnly(200);
-            assertThat(passwordResetOtp(email)).isNotEmpty();
+            assertSentOnce(email, "Password Reset");
         }
     }
 
     /**
      * H2, the same leak in the other email endpoint. Inserting the row that was just
-     * deleted can also deadlock in MySQL, which needs more rounds to show up.
+     * deleted used to deadlock in MySQL, which needs more rounds to show up.
      */
     @Test
     void verificationResendsAllGetTheUsualAnswer() throws Exception {
         for (int round = 0; round < DEADLOCK_ROUNDS; round++) {
             String email = uniqueEmail();
             register(email, PASSWORD);
-            verificationTokenRepository.deleteAllByIdInBatch(
-                    List.of(verificationTokenRepository.findByUser(user(email)).orElseThrow().getId()));
+            verificationToken(email);
+            jdbc.update("delete from one_time_tokens where user_id = ?", user(email).getId());
 
             assertThat(allAtOnce(() -> mvc.perform(get("/auth/verify-email").param("email", email))
                     .andReturn().getResponse().getStatus())).containsOnly(200);
-            assertThat(verificationToken(email)).isNotEmpty();
+            awaitEmails(email, "Verify Email", 2);
+            assertThat(sentEmails(email, "Verify Email")).hasSize(2); // registration, and one resend
+        }
+    }
+
+    /** C1: guesses sent all at once must not get around the limit. */
+    @Test
+    void parallelGuessesAreAllCounted() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String email = uniqueEmail();
+            registerVerifiedUserAndLogin(email);
+            mvc.perform(post("/auth/reset-password").param("email", email));
+            String otp = passwordResetOtp(email);
+
+            assertThat(allAtOnce(() -> confirmPasswordReset(email, wrongOtp(otp)))).containsOnly(400);
+
+            assertThat(jdbc.queryForObject("select attempts from one_time_tokens where user_id = ? and purpose = ?",
+                    Integer.class, user(email).getId(), "PASSWORD_RESET")).isEqualTo(5);
+            assertThat(confirmPasswordReset(email, otp)).isEqualTo(400);
+        }
+    }
+
+    @Test
+    void theRightCodeCanBeUsedOnlyOnceEvenAtTheSameMoment() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String email = uniqueEmail();
+            registerVerifiedUserAndLogin(email);
+            mvc.perform(post("/auth/reset-password").param("email", email));
+            String otp = passwordResetOtp(email);
+
+            List<Integer> statuses = allAtOnce(() -> confirmPasswordReset(email, otp));
+
+            assertThat(statuses).containsOnly(200, 400);
+            assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
+        }
+    }
+
+    @Test
+    void aLinkCanBeUsedOnlyOnceEvenAtTheSameMoment() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String email = uniqueEmail();
+            register(email, PASSWORD);
+            String token = verificationToken(email);
+
+            List<Integer> statuses = allAtOnce(() -> verifyEmail(email, token).andReturn().getResponse().getStatus());
+
+            assertThat(statuses).containsOnly(200, 400);
+            assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
+        }
+    }
+
+    /** Different users must not get in each other's way. */
+    @Test
+    void resetRequestsOfDifferentUsersAllSucceed() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            Queue<String> emails = new ConcurrentLinkedQueue<>();
+            for (int i = 0; i < REQUESTS; i++) {
+                String email = uniqueEmail();
+                registerVerifiedUserAndLogin(email);
+                emails.add(email);
+            }
+            List<String> all = List.copyOf(emails);
+
+            assertThat(allAtOnce(() -> mvc.perform(post("/auth/reset-password").param("email", emails.remove()))
+                    .andReturn().getResponse().getStatus())).containsOnly(200);
+            for (String email : all)
+                awaitEmail(email, "Password Reset");
         }
     }
 
@@ -126,7 +190,21 @@ class ConcurrentRequestTests extends IntegrationTest {
 
             assertThat(statuses).containsOnly(200, 409);
             assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
+            assertSentOnce(email, "Delete Account");
         }
+    }
+
+    private int confirmPasswordReset(String email, String otp) throws Exception {
+        return mvc.perform(post("/auth/reset-password").param("email", email)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"otp": "%s", "password": "N3w-Str0ng-Passw0rd!"}
+                        """.formatted(otp))).andReturn().getResponse().getStatus();
+    }
+
+    private void assertSentOnce(String email, String subject) throws Exception {
+        awaitEmail(email, subject);
+        assertThat(sentEmails(email, subject)).hasSize(1);
     }
 
     /** Runs the request on every thread at the same moment and returns the statuses. */

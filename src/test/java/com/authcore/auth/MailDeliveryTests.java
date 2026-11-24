@@ -16,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,8 +34,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import com.authcore.auth.support.TestcontainersConfiguration;
-import com.authcore.auth.token.VerificationTokenRepository;
-import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 
 /**
@@ -73,12 +73,6 @@ class MailDeliveryTests {
     @Autowired
     private MockMvc mvc;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private VerificationTokenRepository verificationTokenRepository;
-
     private final HttpClient http = HttpClient.newHttpClient();
 
     @Test
@@ -90,10 +84,10 @@ class MailDeliveryTests {
                 {"firstName": "jane", "lastName": "doe", "email": "%s", "password": "%s"}
                 """.formatted(email, PASSWORD))).andExpect(status().isOk());
         Map<String, Object> verification = awaitMessage(email, "Verify Email");
-        String token = verificationTokenRepository
-                .findByUser(userRepository.findByEmail(email).orElseThrow()).orElseThrow().getToken();
         assertSentByAuthCore(verification);
-        assertThat((String) verification.get("HTML")).contains(token);
+        Matcher link = Pattern.compile("token=([A-Za-z0-9_-]{43})").matcher((String) verification.get("HTML"));
+        assertThat(link.find()).isTrue();
+        String token = link.group(1);
 
         // Password reset email
         mvc.perform(get("/auth/verify-email").param("email", email).param("token", token))

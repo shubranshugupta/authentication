@@ -62,8 +62,6 @@ public class AuthConfigProperties {
         private long jwtExpiration;
         @Positive
         private long refreshExpiration;
-        @Positive
-        private long tokenExpiration;
 
         // A check on a boolean, not on the field: the startup error prints the rejected
         // value, and that must not be the key.

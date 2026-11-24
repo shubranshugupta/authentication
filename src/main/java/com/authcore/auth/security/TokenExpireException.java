@@ -1,4 +1,4 @@
-package com.authcore.auth.token;
+package com.authcore.auth.security;
 
 public class TokenExpireException extends RuntimeException {
     public TokenExpireException(String message) {

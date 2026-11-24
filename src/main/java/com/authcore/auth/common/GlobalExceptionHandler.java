@@ -27,9 +27,10 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import com.authcore.auth.token.InvalidTokenException;
+import com.authcore.auth.security.InvalidTokenException;
+import com.authcore.auth.security.TokenExpireException;
+import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.TokenAlreadyExistsException;
-import com.authcore.auth.token.TokenExpireException;
 import com.authcore.auth.user.UserAlreadyExistsException;
 import com.authcore.auth.user.UserNotFoundException;
 
@@ -77,6 +78,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(TokenExpireException e) {
         return problem(ErrorCode.TOKEN_EXPIRED, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(InvalidCodeException e) {
+        return problem(ErrorCode.INVALID_CODE, e.getMessage());
     }
 
     @ExceptionHandler

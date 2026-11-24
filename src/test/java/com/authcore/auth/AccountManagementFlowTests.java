@@ -73,7 +73,6 @@ class AccountManagementFlowTests extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value(RESET_REQUESTED));
         String otp = passwordResetOtp(email);
-        assertThat(htmlBody(awaitEmail(email, "Password Reset"))).contains(otp);
 
         confirmPasswordReset(email, otp, NEW_PASSWORD)
                 .andExpect(status().isOk())
@@ -81,7 +80,6 @@ class AccountManagementFlowTests extends IntegrationTest {
 
         login(email, NEW_PASSWORD).andExpect(status().isOk());
         login(email, PASSWORD).andExpect(status().isUnauthorized());
-        assertThat(passwordResetRepository.findByUser(user(email))).isEmpty();
     }
 
     /** Whoever knew the old password may hold a refresh token, so a reset ends the session. */
@@ -98,33 +96,16 @@ class AccountManagementFlowTests extends IntegrationTest {
     }
 
     @Test
-    void passwordResetWithAWrongOtpReturns401AndKeepsTheOldPassword() throws Exception {
+    void passwordResetWithAWrongOtpReturns400AndKeepsTheOldPassword() throws Exception {
         String email = uniqueEmail();
         registerVerifiedUserAndLogin(email);
         requestPasswordReset(email).andExpect(status().isOk());
 
         confirmPasswordReset(email, wrongOtp(passwordResetOtp(email)), NEW_PASSWORD)
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CODE"));
 
         login(email, PASSWORD).andExpect(status().isOk());
-    }
-
-    /**
-     * A second request while a code is active gets the usual answer (it used to be 409,
-     * which revealed the account, H2) and keeps the first code. Getting a new code still
-     * means waiting for the old one to expire; H3 (Phase 4) adds a short resend cooldown.
-     */
-    @Test
-    void aSecondPasswordResetRequestGetsTheSameAnswerAndKeepsTheFirstCode() throws Exception {
-        String email = uniqueEmail();
-        registerVerifiedUserAndLogin(email);
-        requestPasswordReset(email).andExpect(status().isOk());
-        String firstOtp = passwordResetOtp(email);
-
-        requestPasswordReset(email)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.msg").value(RESET_REQUESTED));
-        assertThat(passwordResetOtp(email)).isEqualTo(firstOtp);
     }
 
     @Test
@@ -136,7 +117,8 @@ class AccountManagementFlowTests extends IntegrationTest {
         requestPasswordReset(email)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value(RESET_REQUESTED));
-        assertThat(passwordResetRepository.findByUser(user(email))).isEmpty();
+        awaitEmail(email, "Verify Email");
+        assertThat(sentEmails(email, "Password Reset")).isEmpty();
     }
 
     // ---- account deletion ----------------------------------------------------------
@@ -150,7 +132,6 @@ class AccountManagementFlowTests extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("Delete account email sent."));
         String otp = deleteAccountOtp(email);
-        assertThat(htmlBody(awaitEmail(email, "Delete Account"))).contains(otp);
 
         confirmAccountDeletion(accessToken, otp)
                 .andExpect(status().isOk())
@@ -176,13 +157,14 @@ class AccountManagementFlowTests extends IntegrationTest {
     }
 
     @Test
-    void accountDeletionWithAWrongOtpReturns401AndKeepsTheUser() throws Exception {
+    void accountDeletionWithAWrongOtpReturns400AndKeepsTheUser() throws Exception {
         String email = uniqueEmail();
         String accessToken = registerVerifiedUserAndLogin(email);
         requestAccountDeletion(accessToken).andExpect(status().isOk());
 
         confirmAccountDeletion(accessToken, wrongOtp(deleteAccountOtp(email)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CODE"));
 
         assertThat(userRepository.findByEmail(email)).isPresent();
     }
@@ -202,7 +184,7 @@ class AccountManagementFlowTests extends IntegrationTest {
                 .param("email", email)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"otp": %s, "password": "%s"}
+                        {"otp": "%s", "password": "%s"}
                         """.formatted(otp, newPassword)));
     }
 
@@ -215,7 +197,7 @@ class AccountManagementFlowTests extends IntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"otp": %s}
+                        {"otp": "%s"}
                         """.formatted(otp)));
     }
 }

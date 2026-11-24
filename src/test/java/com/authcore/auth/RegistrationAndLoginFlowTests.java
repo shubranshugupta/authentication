@@ -86,19 +86,20 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
                 .andExpect(jsonPath("$.msg").value("Email verified successfully"));
 
         assertThat(user(email).isEnabled()).isTrue();
-        assertThat(verificationTokenRepository.findByUser(user(email))).isEmpty();
 
-        // Using the link again: the same 401 as any invalid link. It used to answer
+        // Using the link again: the same answer as for any invalid link. It used to be
         // "Email already verified", which told anyone whether an email was verified (H2).
-        verifyEmail(email, "any-token").andExpect(status().isUnauthorized());
+        verifyEmail(email, verificationToken(email)).andExpect(status().isBadRequest());
     }
 
     @Test
-    void verifyingWithAWrongTokenReturns401AndLeavesTheAccountDisabled() throws Exception {
+    void verifyingWithAWrongTokenReturns400AndLeavesTheAccountDisabled() throws Exception {
         String email = uniqueEmail();
         register(email, PASSWORD).andExpect(status().isOk());
 
-        verifyEmail(email, "not-the-real-token").andExpect(status().isUnauthorized());
+        verifyEmail(email, "not-the-real-token")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CODE"));
 
         assertThat(user(email).isEnabled()).isFalse();
     }

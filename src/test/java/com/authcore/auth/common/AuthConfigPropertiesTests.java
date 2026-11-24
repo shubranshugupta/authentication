@@ -92,7 +92,6 @@ class AuthConfigPropertiesTests {
         token.setSecretKey(secretKey);
         token.setJwtExpiration(1);
         token.setRefreshExpiration(1);
-        token.setTokenExpiration(1);
         return token;
     }
 

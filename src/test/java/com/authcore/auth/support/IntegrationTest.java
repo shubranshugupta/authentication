@@ -6,7 +6,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
@@ -17,15 +21,14 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-import com.authcore.auth.token.DeleteAccountRepository;
-import com.authcore.auth.token.PasswordResetRepository;
-import com.authcore.auth.token.VerificationTokenRepository;
+import com.authcore.auth.token.TokenPurpose;
 import com.authcore.auth.user.User;
 import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
@@ -43,8 +46,8 @@ import jakarta.servlet.http.Cookie;
  * Redis (Testcontainers), called over HTTP through MockMvc.
  *
  * <p>Every subclass shares one Spring context, so the containers start once per run.
- * {@link JavaMailSender} is a mock: emails are captured, never sent. Tests read tokens
- * and OTPs from the database, and check the email that carried them.
+ * {@link JavaMailSender} is a mock: emails are captured, never sent. Tests read links and
+ * codes from those emails, like a user would; the database only has hashes of them.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -62,13 +65,7 @@ public abstract class IntegrationTest {
     protected UserRepository userRepository;
 
     @Autowired
-    protected VerificationTokenRepository verificationTokenRepository;
-
-    @Autowired
-    protected PasswordResetRepository passwordResetRepository;
-
-    @Autowired
-    protected DeleteAccountRepository deleteAccountRepository;
+    protected JdbcTemplate jdbc;
 
     @MockitoBean
     protected JavaMailSender mailSender;
@@ -139,52 +136,76 @@ public abstract class IntegrationTest {
 
     // ---- tokens --------------------------------------------------------------------
 
-    protected String verificationToken(String email) {
-        return verificationTokenRepository.findByUser(user(email)).orElseThrow().getToken();
+    private static final Pattern LINK_TOKEN = Pattern.compile("token=([A-Za-z0-9_-]{43})");
+    private static final Pattern CODE = Pattern.compile(">(\\d{8})<");
+
+    /** The token in the latest verification link that was sent. */
+    protected String verificationToken(String email) throws Exception {
+        return find(LINK_TOKEN, htmlBody(awaitEmail(email, "Verify Email")));
     }
 
-    protected String passwordResetOtp(String email) {
-        return passwordResetRepository.findByUser(user(email)).orElseThrow().getToken();
+    protected String passwordResetOtp(String email) throws Exception {
+        return find(CODE, htmlBody(awaitEmail(email, "Password Reset")));
     }
 
-    protected String deleteAccountOtp(String email) {
-        return deleteAccountRepository.findByUser(user(email)).orElseThrow().getToken();
+    protected String deleteAccountOtp(String email) throws Exception {
+        return find(CODE, htmlBody(awaitEmail(email, "Delete Account")));
     }
 
-    /** A 6-digit OTP that is guaranteed not to be {@code realOtp}. */
+    private static String find(Pattern pattern, String html) {
+        Matcher matcher = pattern.matcher(html);
+        if (!matcher.find())
+            fail("The email has no " + pattern);
+        return matcher.group(1);
+    }
+
+    /** As if the last code had been sent a while ago, so that another one can be sent. */
+    protected void waitOutTheCooldown(String email, TokenPurpose purpose) {
+        jdbc.update("update one_time_tokens set issued_at = issued_at - interval 61 second"
+                + " where user_id = ? and purpose = ?", user(email).getId(), purpose.name());
+    }
+
+    /** A code that is guaranteed not to be {@code realOtp}. */
     protected static String wrongOtp(String realOtp) {
-        return "123456".equals(realOtp) ? "654321" : "123456";
+        return "12345678".equals(realOtp) ? "87654321" : "12345678";
     }
 
     // ---- emails --------------------------------------------------------------------
 
     /**
-     * Waits for an email with this subject to be sent to this address. Emails are sent
-     * on a background thread ({@code @Async}), so they can arrive after the response.
+     * Waits for an email with this subject to be sent to this address, and returns the
+     * latest one. Emails are sent on a background thread ({@code @Async}), so they can
+     * arrive after the response.
      */
     protected MimeMessage awaitEmail(String to, String subject) throws Exception {
-        long deadline = System.currentTimeMillis() + EMAIL_WAIT_MILLIS;
-        while (System.currentTimeMillis() < deadline) {
-            MimeMessage message = sentEmail(to, subject);
-            if (message != null)
-                return message;
-            Thread.sleep(50);
-        }
-        return fail("No email with subject '" + subject + "' was sent to " + to);
+        return awaitEmails(to, subject, 1).getLast();
     }
 
-    /** The email with this subject sent to this address so far, or null. */
-    protected MimeMessage sentEmail(String to, String subject) throws Exception {
+    /** Waits until this many emails were sent, oldest first. */
+    protected List<MimeMessage> awaitEmails(String to, String subject, int count) throws Exception {
+        long deadline = System.currentTimeMillis() + EMAIL_WAIT_MILLIS;
+        while (System.currentTimeMillis() < deadline) {
+            List<MimeMessage> messages = sentEmails(to, subject);
+            if (messages.size() >= count)
+                return messages;
+            Thread.sleep(50);
+        }
+        return fail("Fewer than " + count + " emails with subject '" + subject + "' were sent to " + to);
+    }
+
+    /** The emails with this subject sent to this address so far, oldest first. */
+    protected List<MimeMessage> sentEmails(String to, String subject) throws Exception {
+        List<MimeMessage> messages = new ArrayList<>();
         for (Invocation invocation : Mockito.mockingDetails(mailSender).getInvocations()) {
             if (invocation.getMethod().getName().equals("send")
                     && invocation.getArguments().length == 1
                     && invocation.getArguments()[0] instanceof MimeMessage message
                     && to.equals(recipient(message))
                     && subject.equals(message.getSubject())) {
-                return message;
+                messages.add(message);
             }
         }
-        return null;
+        return messages;
     }
 
     protected static String htmlBody(MimeMessage message) throws Exception {

@@ -114,7 +114,7 @@ class EmailListenerTests extends IntegrationTest {
     private void assertNotSentWithin(long millis, String to) {
         try {
             Thread.sleep(millis);
-            assertThat(sentEmail(to, "Password Reset")).isNull();
+            assertThat(sentEmails(to, "Password Reset")).isEmpty();
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }

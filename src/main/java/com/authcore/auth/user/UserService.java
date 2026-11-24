@@ -2,8 +2,11 @@ package com.authcore.auth.user;
 
 import org.springframework.stereotype.Service;
 
-import com.authcore.auth.token.TokenServiceFacade;
-import com.authcore.auth.token.TokenType;
+import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.token.InvalidCodeException;
+import com.authcore.auth.token.OneTimeTokenService;
+import com.authcore.auth.token.TokenAlreadyExistsException;
+import com.authcore.auth.token.TokenPurpose;
 
 import lombok.RequiredArgsConstructor;
 
@@ -12,7 +15,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
-    private final TokenServiceFacade tokenService;
+    private final OneTimeTokenService tokens;
+    private final RetryingTransaction transaction;
 
     public UserResponse getProfile(Integer userId) {
         User user = getUser(userId);
@@ -31,13 +35,19 @@ public class UserService {
     }
 
     public void requestDeletion(Integer userId) {
-        tokenService.createTokenAndSendMail(getUser(userId), TokenType.DELETE_ACCOUNT_TOKEN);
+        if (!tokens.issue(getUser(userId).getId(), TokenPurpose.ACCOUNT_DELETION))
+            throw new TokenAlreadyExistsException("A code was sent less than a minute ago. Check your inbox, or try again in a minute.");
     }
 
-    public void confirmDeletion(Integer userId, String otp) {
-        User user = getUser(userId);
-        tokenService.verifyToken(user, otp, TokenType.DELETE_ACCOUNT_TOKEN);
-        userRepository.delete(user);
+    public void confirmDeletion(Integer userId, String code) {
+        boolean deleted = transaction.run(() -> tokens
+                .consumeCode(userId, code, TokenPurpose.ACCOUNT_DELETION, user -> true)
+                .map(user -> {
+                    userRepository.delete(user);
+                    return true;
+                }).orElse(false));
+        if (!deleted)
+            throw new InvalidCodeException("The code is invalid or has expired.");
     }
 
     private User getUser(Integer userId) {

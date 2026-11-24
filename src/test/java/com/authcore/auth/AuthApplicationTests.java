@@ -7,14 +7,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.authcore.auth.support.IntegrationTest;
 
 class AuthApplicationTests extends IntegrationTest {
-
-	@Autowired
-	private JdbcTemplate jdbc;
 
 	@Autowired
 	private Environment environment;
@@ -35,7 +31,13 @@ class AuthApplicationTests extends IntegrationTest {
 		List<String> tables = jdbc.queryForList(
 				"select table_name from information_schema.tables where table_schema = database()",
 				String.class);
-		assertThat(tables).contains("users", "refresh_tokens", "verification_tokens",
-				"password_reset_otp", "delete_account_otp");
+		assertThat(tables).contains("users", "refresh_tokens", "one_time_tokens");
+		assertThat(tables).doesNotContain("verification_tokens", "password_reset_otp", "delete_account_otp");
+	}
+
+	/** OneTimeTokenService relies on it. */
+	@Test
+	void transactionsReadWhatIsCommitted() {
+		assertThat(jdbc.queryForObject("select @@transaction_isolation", String.class)).isEqualTo("READ-COMMITTED");
 	}
 }

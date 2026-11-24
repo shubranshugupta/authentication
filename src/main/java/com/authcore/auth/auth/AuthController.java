@@ -79,7 +79,7 @@ public class AuthController {
             authService.resendVerification(email);
             return message(VERIFICATION_REQUESTED);
         }
-        authService.verifyEmail(email, token);
+        authService.verifyEmail(token);
         return message("Email verified successfully");
     }
 
@@ -90,7 +90,7 @@ public class AuthController {
             authService.requestPasswordReset(email);
             return message(RESET_REQUESTED);
         }
-        authService.resetPassword(email, String.valueOf(request.getOtp()), request.getPassword());
+        authService.resetPassword(email, request.getOtp(), request.getPassword());
         return message("Password reset successfully");
     }
 
