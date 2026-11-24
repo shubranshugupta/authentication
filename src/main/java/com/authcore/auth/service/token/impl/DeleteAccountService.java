@@ -2,16 +2,11 @@ package com.authcore.auth.service.token.impl;
 
 import java.security.SecureRandom;
 
-import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
-import com.authcore.auth.dto.EmailDTO;
-import com.authcore.auth.dto.emaildtoimpl.TokenEmailDTO;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.impl.DeleteAccountOtp;
-import com.authcore.auth.event.DeleteAccountEvent;
 import com.authcore.auth.repository.DeleteAccountRepository;
 import com.authcore.auth.service.token.TokenTemplate;
 
@@ -45,18 +40,12 @@ public class DeleteAccountService extends TokenTemplate<DeleteAccountOtp> {
     }
 
     @Override
-    protected ApplicationEvent getApplicationEvent(User user, EmailDTO tokenEmailDTO) {
-        return new DeleteAccountEvent(user, tokenEmailDTO);
+    protected String getEmailSubject() {
+        return "Delete Account";
     }
 
     @Override
-    protected EmailDTO getEmailDto(User user, DeleteAccountOtp newToken) {
-        return TokenEmailDTO.builder()
-                .email(user.getEmail())
-                .firstName(StringUtils.capitalize(user.getFirstName()))
-                .lastName(StringUtils.capitalize(user.getLastName()))
-                .token(newToken.getToken())
-                .baseUrl(getAppUrl())
-                .build();
+    protected String getEmailTemplate() {
+        return "delete_account_email";
     }
 }

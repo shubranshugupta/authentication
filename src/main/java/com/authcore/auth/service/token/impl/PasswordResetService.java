@@ -3,16 +3,11 @@ package com.authcore.auth.service.token.impl;
 import java.security.SecureRandom;
 import java.util.List;
 
-import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
-import com.authcore.auth.dto.EmailDTO;
-import com.authcore.auth.dto.emaildtoimpl.TokenEmailDTO;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.impl.PasswordResetOtp;
-import com.authcore.auth.event.PasswordResetEvent;
 import com.authcore.auth.repository.PasswordResetRepository;
 import com.authcore.auth.service.token.TokenTemplate;
 
@@ -47,19 +42,12 @@ public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
     }
 
     @Override
-    protected ApplicationEvent getApplicationEvent(User user, EmailDTO tokenEmailDTO) {
-        return new PasswordResetEvent(user, tokenEmailDTO);
+    protected String getEmailSubject() {
+        return "Password Reset";
     }
 
     @Override
-    protected EmailDTO getEmailDto(User user, PasswordResetOtp newToken) {
-        return TokenEmailDTO.builder()
-                .email(user.getEmail())
-                .firstName(StringUtils.capitalize(user.getFirstName()))
-                .lastName(StringUtils.capitalize(user.getLastName()))
-                .token(newToken.getToken())
-                .baseUrl(getAppUrl())
-                .build();
+    protected String getEmailTemplate() {
+        return "password_reset_email";
     }
-
 }

@@ -1,16 +1,18 @@
 package com.authcore.auth.service.token;
 
 import java.time.Instant;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.List;
 
+import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.authcore.auth.event.EmailRequested;
 import com.authcore.auth.utils.DeadlockRetry;
-import com.authcore.auth.dto.EmailDTO;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.Token;
 import com.authcore.auth.exception.InvalidTokenException;
@@ -82,14 +84,26 @@ public abstract class TokenTemplate<T extends Token> {
     }
 
     public void publishEmailEvent(User user, T newToken) {
-        EmailDTO tokenEmailDTO = getEmailDto(user, newToken);
-        ApplicationEvent event = getApplicationEvent(user, tokenEmailDTO);
-        eventPublisher.publishEvent(event);
+        Map<String, Object> vars = new HashMap<>(); // not Map.of: the last name may be null
+        vars.put("firstName", StringUtils.capitalize(user.getFirstName()));
+        vars.put("lastName", StringUtils.capitalize(user.getLastName()));
+        vars.put("token", getEmailToken(user, newToken));
+        vars.put("baseUrl", APP_URL);
+        eventPublisher.publishEvent(new EmailRequested(user.getEmail(), getEmailSubject(), getEmailTemplate(), vars));
     }
 
     public String getAppUrl() {
         return APP_URL;
     }
+
+    /** What the email shows: the code itself, unless the subclass makes it a link. */
+    protected String getEmailToken(User user, T newToken) {
+        return newToken.getToken();
+    }
+
+    protected abstract String getEmailSubject();
+
+    protected abstract String getEmailTemplate();
 
     protected abstract void deleteToken(T origToken);
 
@@ -98,8 +112,4 @@ public abstract class TokenTemplate<T extends Token> {
     protected abstract T getTokenFromUser(User user);
 
     protected abstract String generateRandomTokenID();
-
-    protected abstract ApplicationEvent getApplicationEvent(User user, EmailDTO tokenEmailDTO);
-
-    protected abstract EmailDTO getEmailDto(User user, T newToken);
 }
