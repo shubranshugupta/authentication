@@ -7,6 +7,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.utils.DeadlockRetry;
 import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.dto.request.RegisterRequest;
 import com.authcore.auth.entities.Role;
@@ -120,7 +121,7 @@ public class AuthService {
      */
     private User saveNewUser(User user) {
         try {
-            return userRepository.save(user);
+            return DeadlockRetry.run(() -> userRepository.save(user));
         } catch (DataIntegrityViolationException e) {
             if (userRepository.findByEmail(user.getEmail()).isEmpty())
                 throw e;

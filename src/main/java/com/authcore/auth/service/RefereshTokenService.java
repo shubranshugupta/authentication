@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.utils.DeadlockRetry;
 import com.authcore.auth.repository.UserRepository;
 import com.authcore.auth.entities.RefreshToken;
 import com.authcore.auth.entities.User;
@@ -28,6 +29,10 @@ public class RefereshTokenService {
     private long expireTime;
 
     public RefreshToken createRefereshToken(User user) {
+        return DeadlockRetry.run(() -> tryToCreateRefereshToken(user));
+    }
+
+    private RefreshToken tryToCreateRefereshToken(User user) {
         RefreshToken refereshToken = refereshTokenRepository.findByUser(user).orElse(null);
         if (refereshToken != null && refereshToken.getExpiryDate().isAfter(Instant.now())) {
             return refereshToken;

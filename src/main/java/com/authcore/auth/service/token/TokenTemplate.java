@@ -9,6 +9,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.authcore.auth.utils.DeadlockRetry;
 import com.authcore.auth.dto.EmailDTO;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.Token;
@@ -30,6 +31,10 @@ public abstract class TokenTemplate<T extends Token> {
     }
 
     public T createToken(User user) {
+        return DeadlockRetry.run(() -> tryToCreateToken(user));
+    }
+
+    private T tryToCreateToken(User user) {
         T token = getTokenFromUser(user);
 
         if (token != null && token.getExpiryDate().isAfter(Instant.now()))
