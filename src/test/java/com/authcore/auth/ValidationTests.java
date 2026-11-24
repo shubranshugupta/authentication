@@ -2,12 +2,10 @@ package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -130,14 +128,22 @@ class ValidationTests extends IntegrationTest {
     void profileUpdateRejectsABlankFirstName() throws Exception {
         String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
 
-        mvc.perform(put("/user/update-info")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"firstName": "  ", "lastName": "doe"}
-                        """))
+        for (String blank : new String[] { "", "  ", "\\n" })
+            updateProfile(accessToken, """
+                    {"firstName": "%s", "lastName": "doe"}
+                    """.formatted(blank))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors.firstName").value("must not be blank"));
+    }
+
+    @Test
+    void accountDeletionNeedsACodeAndAPassword() throws Exception {
+        String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
+
+        confirmAccountDeletion(accessToken, "1234", "")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors.firstName").exists());
+                .andExpect(jsonPath("$.errors.otp").exists())
+                .andExpect(jsonPath("$.errors.password").exists());
     }
 
     // ---- email normalization -------------------------------------------------------

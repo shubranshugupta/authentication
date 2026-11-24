@@ -85,13 +85,13 @@ class ErrorResponseTests extends IntegrationTest {
 
     @Test
     void noToken() throws Exception {
-        expect(401, "AUTHENTICATION_REQUIRED", get("/user/get-info"));
+        expect(401, "AUTHENTICATION_REQUIRED", get("/api/v1/users/me"));
     }
 
     /** A browser page load asks for HTML; the error must still be readable. */
     @Test
     void noTokenAndAClientThatWantsHtml() throws Exception {
-        expect(401, "AUTHENTICATION_REQUIRED", get("/user/get-info").accept(MediaType.TEXT_HTML));
+        expect(401, "AUTHENTICATION_REQUIRED", get("/api/v1/users/me").accept(MediaType.TEXT_HTML));
     }
 
     @Test
@@ -100,7 +100,7 @@ class ErrorResponseTests extends IntegrationTest {
                 .expiration(Date.from(Instant.now().minusSeconds(60)))
                 .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret)), Jwts.SIG.HS256).compact();
 
-        expect(401, "TOKEN_EXPIRED", as(expired, get("/user/get-info")))
+        expect(401, "TOKEN_EXPIRED", as(expired, get("/api/v1/users/me")))
                 .andExpect(jsonPath("$.detail").value("The access token has expired."));
     }
 
@@ -134,8 +134,8 @@ class ErrorResponseTests extends IntegrationTest {
     @Test
     void codeAlreadySent() throws Exception {
         String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
-        mvc.perform(as(accessToken, delete("/user/delete"))).andExpect(status().isOk());
-        expect(409, "TOKEN_ALREADY_EXISTS", as(accessToken, delete("/user/delete")));
+        mvc.perform(as(accessToken, post("/api/v1/users/me/deletion"))).andExpect(status().isOk());
+        expect(409, "TOKEN_ALREADY_EXISTS", as(accessToken, post("/api/v1/users/me/deletion")));
     }
 
     // ---- users ---------------------------------------------------------------------
@@ -168,10 +168,6 @@ class ErrorResponseTests extends IntegrationTest {
 
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder request, String body) {
         return request.contentType(MediaType.APPLICATION_JSON).content(body);
-    }
-
-    private static MockHttpServletRequestBuilder as(String accessToken, MockHttpServletRequestBuilder request) {
-        return request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
     }
 
     private String admin() throws Exception {

@@ -126,8 +126,11 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
         mvc.perform(get("/auth/verify-email").param("email", email).param("token", token)).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/auth/email-verification/confirm").param("token", token)).andExpect(status().isMethodNotAllowed());
         mvc.perform(post("/auth/login")).andExpect(status().isUnauthorized());
-
         assertThat(user(email).isEnabled()).isFalse();
+
+        String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
+        for (String path : new String[] { "/user/get-info", "/user/delete", "/user/hello" })
+            mvc.perform(as(accessToken, get(path))).andExpect(status().isNotFound());
     }
 
     // ---- login ---------------------------------------------------------------------
@@ -198,15 +201,6 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
         mvc.perform(post("/api/v1/auth/refresh")).andExpect(status().isBadRequest());
     }
 
-    /** Cleanup: the leftover test endpoint is gone. */
-    @Test
-    void theHelloEndpointIsGone() throws Exception {
-        String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
-
-        mvc.perform(get("/user/hello").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-                .andExpect(status().isNotFound());
-    }
-
     // ---- access tokens -------------------------------------------------------------
 
     @Test
@@ -224,7 +218,7 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
 
     @Test
     void protectedEndpointWithoutATokenReturns401() throws Exception {
-        mvc.perform(get("/user/get-info")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/users/me")).andExpect(status().isUnauthorized());
     }
 
     @Test

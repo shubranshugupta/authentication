@@ -16,7 +16,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
 
 import com.authcore.auth.support.IntegrationTest;
 
@@ -180,8 +179,7 @@ class ConcurrentRequestTests extends IntegrationTest {
             String email = uniqueEmail();
             String accessToken = registerVerifiedUserAndLogin(email);
 
-            List<Integer> statuses = allAtOnce(() -> mvc.perform(delete("/user/delete")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)).andReturn().getResponse().getStatus());
+            List<Integer> statuses = allAtOnce(() -> requestAccountDeletion(accessToken).andReturn().getResponse().getStatus());
 
             assertThat(statuses).containsOnly(200, 409);
             assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);

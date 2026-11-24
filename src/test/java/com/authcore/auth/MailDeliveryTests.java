@@ -2,7 +2,6 @@ package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -105,7 +104,7 @@ class MailDeliveryTests {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String accessToken = JsonPath.read(body, "$.accessToken");
-        mvc.perform(delete("/user/delete").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        mvc.perform(post("/api/v1/users/me/deletion").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk());
         assertSentByAuthCore(awaitMessage(email, "Delete Account"));
     }

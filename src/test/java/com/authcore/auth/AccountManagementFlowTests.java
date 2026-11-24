@@ -1,15 +1,10 @@
 package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.ResultActions;
 
 import com.authcore.auth.support.IntegrationTest;
 
@@ -27,12 +22,9 @@ class AccountManagementFlowTests extends IntegrationTest {
         String email = uniqueEmail();
         String accessToken = registerVerifiedUserAndLogin(email);
 
-        mvc.perform(put("/user/update-info")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"firstName": "janet", "lastName": "smith"}
-                        """))
+        updateProfile(accessToken, """
+                {"firstName": "janet", "lastName": "smith"}
+                """)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("User info updated successfully."));
 
@@ -43,6 +35,29 @@ class AccountManagementFlowTests extends IntegrationTest {
         assertThat(user(email).getFirstName()).isEqualTo("janet");
     }
 
+    /** PATCH: what is left out stays as it was. */
+    @Test
+    void updatingOneNameKeepsTheOther() throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+
+        updateProfile(accessToken, "{\"firstName\": \"janet\"}").andExpect(status().isOk());
+        getProfile(accessToken)
+                .andExpect(jsonPath("$.firstName").value("janet"))
+                .andExpect(jsonPath("$.lastName").value("doe"));
+
+        updateProfile(accessToken, "{\"lastName\": \"smith\"}").andExpect(status().isOk());
+        getProfile(accessToken)
+                .andExpect(jsonPath("$.firstName").value("janet"))
+                .andExpect(jsonPath("$.lastName").value("smith"));
+
+        updateProfile(accessToken, "{}").andExpect(status().isOk());
+        assertThat(user(email).getFirstName()).isEqualTo("janet");
+
+        updateProfile(accessToken, "{\"lastName\": \"\"}").andExpect(status().isOk());
+        assertThat(user(email).getLastName()).isNull();
+    }
+
     /** The cached user used to be saved without its links, which deleted its refresh token. */
     @Test
     void updatingTheProfileKeepsTheUserLoggedIn() throws Exception {
@@ -50,12 +65,9 @@ class AccountManagementFlowTests extends IntegrationTest {
         String accessToken = registerVerifiedUserAndLogin(email);
         Cookie refreshCookie = refreshCookie(email, PASSWORD);
 
-        mvc.perform(put("/user/update-info")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"firstName": "janet", "lastName": "smith"}
-                        """))
+        updateProfile(accessToken, """
+                {"firstName": "janet", "lastName": "smith"}
+                """)
                 .andExpect(status().isOk());
 
         refresh(refreshCookie).andExpect(status().isOk());
@@ -132,7 +144,7 @@ class AccountManagementFlowTests extends IntegrationTest {
                 .andExpect(jsonPath("$.msg").value("Delete account email sent."));
         String otp = deleteAccountOtp(email);
 
-        confirmAccountDeletion(accessToken, otp)
+        confirmAccountDeletion(accessToken, otp, PASSWORD)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("User deleted successfully."));
 
@@ -149,7 +161,7 @@ class AccountManagementFlowTests extends IntegrationTest {
         refresh(refreshCookie).andExpect(status().isOk());
 
         requestAccountDeletion(accessToken).andExpect(status().isOk());
-        confirmAccountDeletion(accessToken, deleteAccountOtp(email)).andExpect(status().isOk());
+        confirmAccountDeletion(accessToken, deleteAccountOtp(email), PASSWORD).andExpect(status().isOk());
 
         getProfile(accessToken).andExpect(status().isUnauthorized());
         refresh(refreshCookie).andExpect(status().isUnauthorized());
@@ -161,25 +173,63 @@ class AccountManagementFlowTests extends IntegrationTest {
         String accessToken = registerVerifiedUserAndLogin(email);
         requestAccountDeletion(accessToken).andExpect(status().isOk());
 
-        confirmAccountDeletion(accessToken, wrongOtp(deleteAccountOtp(email)))
+        confirmAccountDeletion(accessToken, wrongOtp(deleteAccountOtp(email)), PASSWORD)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_CODE"));
 
         assertThat(userRepository.findByEmail(email)).isPresent();
     }
 
-    // ---- helpers -------------------------------------------------------------------
+    /** H8: a session and access to the inbox aren't enough. */
+    @Test
+    void accountDeletionNeedsThePassword() throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        requestAccountDeletion(accessToken).andExpect(status().isOk());
+        String otp = deleteAccountOtp(email);
 
-    private ResultActions requestAccountDeletion(String accessToken) throws Exception {
-        return mvc.perform(delete("/user/delete").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+        confirmAccountDeletion(accessToken, otp, "wrong-password")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CODE"));
+        assertThat(userRepository.findByEmail(email)).isPresent();
+
+        confirmAccountDeletion(accessToken, otp, PASSWORD).andExpect(status().isOk());
+        assertThat(userRepository.findByEmail(email)).isEmpty();
     }
 
-    private ResultActions confirmAccountDeletion(String accessToken, String otp) throws Exception {
-        return mvc.perform(delete("/user/delete")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"otp": "%s"}
-                        """.formatted(otp)));
+    /** Otherwise this would be a place to guess passwords without a limit. */
+    @Test
+    void wrongPasswordsUseUpTheCode() throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        requestAccountDeletion(accessToken).andExpect(status().isOk());
+        String otp = deleteAccountOtp(email);
+
+        for (int i = 0; i < 5; i++)
+            confirmAccountDeletion(accessToken, otp, "wrong-password").andExpect(status().isBadRequest());
+
+        confirmAccountDeletion(accessToken, otp, PASSWORD).andExpect(status().isBadRequest());
+        assertThat(userRepository.findByEmail(email)).isPresent();
+    }
+
+    @Test
+    void aWrongCodeAndAWrongPasswordGetTheSameAnswer() throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        requestAccountDeletion(accessToken).andExpect(status().isOk());
+        String otp = deleteAccountOtp(email);
+
+        String wrongCode = confirmAccountDeletion(accessToken, wrongOtp(otp), PASSWORD)
+                .andReturn().getResponse().getContentAsString();
+        String wrongPassword = confirmAccountDeletion(accessToken, otp, "wrong-password")
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(wrongCode).isEqualTo(wrongPassword);
+    }
+
+    @Test
+    void accountDeletionNeedsALogin() throws Exception {
+        postJson("/api/v1/users/me/deletion", "").andExpect(status().isUnauthorized());
+        postJson("/api/v1/users/me/deletion/confirm", "{}").andExpect(status().isUnauthorized());
     }
 }

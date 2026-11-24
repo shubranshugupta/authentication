@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.authcore.auth.common.RetryingTransaction;
@@ -30,13 +31,15 @@ class UserServiceTests {
     private UserRepository userRepository;
     @Mock
     private OneTimeTokenService tokens;
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     private UserService userService;
 
     @BeforeEach
     void createService() {
         userService = new UserService(userRepository, tokens,
-                new RetryingTransaction(TransactionOperations.withoutTransaction()));
+                new RetryingTransaction(TransactionOperations.withoutTransaction()), passwordEncoder);
     }
 
     private final User user = User.builder().id(7).email("jane@example.com").firstName("jane").lastName("doe")
@@ -50,7 +53,7 @@ class UserServiceTests {
 
         verify(userRepository).save(user);
         assertThat(user.getFirstName()).isEqualTo("janet");
-        assertThat(user.getLastName()).isNull();
+        assertThat(user.getLastName()).isEqualTo("doe");
         assertThat(user.getEmail()).isEqualTo("jane@example.com");
         assertThat(user.getPassword()).isEqualTo("hash");
     }
@@ -60,10 +63,10 @@ class UserServiceTests {
         when(tokens.consumeCode(eq(7), eq("11111111"), eq(TokenPurpose.ACCOUNT_DELETION), any())).thenReturn(Optional.empty());
         when(tokens.consumeCode(eq(7), eq("22222222"), eq(TokenPurpose.ACCOUNT_DELETION), any())).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> userService.confirmDeletion(7, "11111111")).isInstanceOf(InvalidCodeException.class);
+        assertThatThrownBy(() -> userService.confirmDeletion(7, "11111111", "pw")).isInstanceOf(InvalidCodeException.class);
         verify(userRepository, never()).delete(any());
 
-        userService.confirmDeletion(7, "22222222");
+        userService.confirmDeletion(7, "22222222", "pw");
         verify(userRepository).delete(user);
     }
 

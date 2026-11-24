@@ -3,6 +3,7 @@ package com.authcore.auth.support;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,6 +28,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.authcore.auth.token.TokenPurpose;
 import com.authcore.auth.user.User;
@@ -155,7 +157,27 @@ public abstract class IntegrationTest {
     }
 
     protected ResultActions getProfile(String accessToken) throws Exception {
-        return mvc.perform(get("/user/get-info").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+        return mvc.perform(as(accessToken, get("/api/v1/users/me")));
+    }
+
+    protected ResultActions updateProfile(String accessToken, String body) throws Exception {
+        return mvc.perform(as(accessToken, patch("/api/v1/users/me")).contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    protected ResultActions requestAccountDeletion(String accessToken) throws Exception {
+        return mvc.perform(as(accessToken, post("/api/v1/users/me/deletion")));
+    }
+
+    protected ResultActions confirmAccountDeletion(String accessToken, String otp, String password) throws Exception {
+        return mvc.perform(as(accessToken, post("/api/v1/users/me/deletion/confirm"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"otp": "%s", "password": "%s"}
+                        """.formatted(otp, password)));
+    }
+
+    protected static MockHttpServletRequestBuilder as(String accessToken, MockHttpServletRequestBuilder request) {
+        return request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
     }
 
     // ---- tokens --------------------------------------------------------------------
