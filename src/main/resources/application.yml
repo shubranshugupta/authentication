@@ -24,11 +24,9 @@ spring:
         # Hibernate 7 failed when saving them (e.g. email verification returned 500).
         open-in-view: false
 
+    # The mail server (host, port, login) is set per profile: dev sends to Mailpit,
+    # prod needs MAIL_HOST, MAIL_PORT, MAIL_USERNAME and MAIL_PASSWORD.
     mail:
-        host: smtp.gmail.com
-        port: 587
-        username: ${MAIL_USERNAME}
-        password: ${MAIL_PASSWORD}
         properties:
             mail:
                 smtp:

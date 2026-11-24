@@ -15,5 +15,14 @@ spring:
             host: ${REDIS_HOST:localhost}
             port: ${REDIS_PORT:6379}
 
+    # Mailpit from docker-compose.yml: emails show up at http://localhost:8025.
+    # It accepts any username and password. To send real emails from dev,
+    # set MAIL_HOST, MAIL_PORT, MAIL_USERNAME and MAIL_PASSWORD.
+    mail:
+        host: ${MAIL_HOST:localhost}
+        port: ${MAIL_PORT:1025}
+        username: ${MAIL_USERNAME:dev}
+        password: ${MAIL_PASSWORD:dev}
+
     jpa:
         show-sql: true
