@@ -11,8 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 
-import com.authcore.auth.service.CacheService;
-import com.authcore.auth.service.CachedRefreshToken;
+import com.authcore.auth.common.CacheService;
+import com.authcore.auth.session.CachedRefreshToken;
 import com.authcore.auth.support.IntegrationTest;
 
 /**

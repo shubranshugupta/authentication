@@ -7,8 +7,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import com.authcore.auth.entities.Role;
-import com.authcore.auth.entities.User;
+import com.authcore.auth.user.Role;
+import com.authcore.auth.user.User;
 
 /**
  * The logged-in user, as Spring Security and the controllers see it

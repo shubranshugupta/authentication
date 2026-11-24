@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 
-import com.authcore.auth.entities.User;
 import com.authcore.auth.support.IntegrationTest;
+import com.authcore.auth.user.User;
 import com.jayway.jsonpath.JsonPath;
 
 import io.jsonwebtoken.Jwts;

@@ -1,0 +1,26 @@
+package com.authcore.auth.token;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+
+@Entity
+@NoArgsConstructor
+@AllArgsConstructor
+@Table(name = "password_reset_otp")
+public class PasswordResetOtp extends Token {
+    @Column(name = "otp", nullable = false)
+    private long otp;
+
+    @Override
+    public String getToken() {
+        return String.valueOf(otp);
+    }
+
+    @Override
+    public void setToken(String token) {
+        this.otp = Long.parseLong(token);
+    }
+}

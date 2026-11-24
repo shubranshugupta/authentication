@@ -23,11 +23,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-import com.authcore.auth.entities.User;
-import com.authcore.auth.repository.DeleteAccountRepository;
-import com.authcore.auth.repository.PasswordResetRepository;
-import com.authcore.auth.repository.UserRepository;
-import com.authcore.auth.repository.VerificationTokenRepository;
+import com.authcore.auth.token.DeleteAccountRepository;
+import com.authcore.auth.token.PasswordResetRepository;
+import com.authcore.auth.token.VerificationTokenRepository;
+import com.authcore.auth.user.User;
+import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 
 import jakarta.mail.Message;

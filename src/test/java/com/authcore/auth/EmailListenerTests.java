@@ -19,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import com.authcore.auth.event.EmailRequested;
+import com.authcore.auth.notification.EmailRequested;
 import com.authcore.auth.support.IntegrationTest;
 
 import jakarta.mail.internet.MimeMessage;
