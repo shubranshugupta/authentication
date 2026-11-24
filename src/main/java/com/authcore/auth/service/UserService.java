@@ -3,9 +3,6 @@ package com.authcore.auth.service;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import com.authcore.auth.dto.request.DeleteAccountRequest;
-import com.authcore.auth.dto.request.UpdateUserRequest;
-import com.authcore.auth.dto.response.MsgResponse;
 import com.authcore.auth.dto.response.UserResposne;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.repository.UserRepository;
@@ -13,69 +10,41 @@ import com.authcore.auth.service.token.TokenType;
 
 import lombok.RequiredArgsConstructor;
 
+/** What a logged-in user can do with their own account. Knows nothing about HTTP (A5). */
 @Service
 @RequiredArgsConstructor
 public class UserService {
-        private final UserRepository userRepository;
-        private final JwtService jwtService;
-        private final TokenServiceFacade tokenService;
+    private final UserRepository userRepository;
+    private final TokenServiceFacade tokenService;
 
-        public UserResposne getUserInfo(String token) {
-                String email = jwtService.getEmailFromToken(token);
-                User user = getUserByEmail(email);
-                if (user == null)
-                        throw new UsernameNotFoundException(email + " user not exists.");
+    public UserResposne getProfile(Integer userId) {
+        User user = getUser(userId);
+        return UserResposne.builder()
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
+    }
 
-                return UserResposne.builder()
-                                .email(user.getEmail())
-                                .firstName(user.getFirstName())
-                                .lastName(user.getLastName())
-                                .build();
-        }
+    public void updateProfile(Integer userId, String firstName, String lastName) {
+        User user = getUser(userId);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        userRepository.save(user);
+    }
 
-        public MsgResponse updateUserInfo(String token, UpdateUserRequest newInfo) {
-                String email = jwtService.getEmailFromToken(token);
-                User user = getUserByEmail(email);
-                if (user == null)
-                        throw new UsernameNotFoundException(email + " user not exists.");
+    public void requestDeletion(Integer userId) {
+        tokenService.createTokenAndSendMail(getUser(userId), TokenType.DELETE_ACCOUNT_TOKEN);
+    }
 
-                user.setFirstName(newInfo.getFirstName());
-                user.setLastName(newInfo.getLastName());
+    public void confirmDeletion(Integer userId, String otp) {
+        User user = getUser(userId);
+        tokenService.verifyToken(user, otp, TokenType.DELETE_ACCOUNT_TOKEN);
+        userRepository.delete(user);
+    }
 
-                saveUser(user);
-
-                return MsgResponse.builder()
-                                .msg("User info updated successfully.")
-                                .build();
-        }
-
-        public MsgResponse deleteUser(String token, DeleteAccountRequest request) {
-                String email = jwtService.getEmailFromToken(token);
-                User user = userRepository.findByEmail(email)
-                                .orElseThrow(() -> new UsernameNotFoundException(email + " user not exists."));
-
-                if (request == null) {
-                        tokenService.createTokenAndSendMail(user, TokenType.DELETE_ACCOUNT_TOKEN);
-
-                        return MsgResponse.builder()
-                                        .msg("Delete account email sent.")
-                                        .build();
-                }
-
-                tokenService.verifyToken(user, String.valueOf(request.getOtp()), TokenType.DELETE_ACCOUNT_TOKEN);
-
-                userRepository.delete(user);
-
-                return MsgResponse.builder()
-                                .msg("User deleted successfully.")
-                                .build();
-        }
-
-        public User getUserByEmail(String email) {
-                return userRepository.findByEmail(email).orElse(null);
-        }
-
-        public User saveUser(User user) {
-                return userRepository.save(user);
-        }
+    private User getUser(Integer userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User " + userId + " not found"));
+    }
 }

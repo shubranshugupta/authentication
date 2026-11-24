@@ -73,8 +73,4 @@ public class JwtService {
         byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         return Keys.hmacShaKeyFor(keyBytes);
     }
-
-    public String getEmailFromToken(String token) {
-        return extractEmail(token.substring(7));
-    }
 }
