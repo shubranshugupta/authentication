@@ -3,7 +3,6 @@ package com.authcore.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,7 +17,6 @@ import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 
 import com.authcore.auth.support.IntegrationTest;
 
@@ -39,7 +37,7 @@ class ConcurrentRequestTests extends IntegrationTest {
         for (int round = 0; round < ROUNDS; round++) {
             String email = uniqueEmail();
             register(email, PASSWORD);
-            verifyEmail(email, verificationToken(email));
+            verifyEmail(verificationToken(email));
             List<String> refreshTokens = Collections.synchronizedList(new ArrayList<>());
 
             List<Integer> statuses = allAtOnce(() -> {
@@ -76,8 +74,7 @@ class ConcurrentRequestTests extends IntegrationTest {
             String email = uniqueEmail();
             registerVerifiedUserAndLogin(email);
 
-            assertThat(allAtOnce(() -> mvc.perform(post("/auth/reset-password").param("email", email))
-                    .andReturn().getResponse().getStatus())).containsOnly(200);
+            assertThat(allAtOnce(() -> requestPasswordReset(email).andReturn().getResponse().getStatus())).containsOnly(200);
             assertSentOnce(email, "Password Reset");
         }
     }
@@ -94,8 +91,7 @@ class ConcurrentRequestTests extends IntegrationTest {
             verificationToken(email);
             jdbc.update("delete from one_time_tokens where user_id = ?", user(email).getId());
 
-            assertThat(allAtOnce(() -> mvc.perform(get("/auth/verify-email").param("email", email))
-                    .andReturn().getResponse().getStatus())).containsOnly(200);
+            assertThat(allAtOnce(() -> resendVerification(email).andReturn().getResponse().getStatus())).containsOnly(200);
             awaitEmails(email, "Verify Email", 2);
             assertThat(sentEmails(email, "Verify Email")).hasSize(2); // registration, and one resend
         }
@@ -107,7 +103,7 @@ class ConcurrentRequestTests extends IntegrationTest {
         for (int round = 0; round < ROUNDS; round++) {
             String email = uniqueEmail();
             registerVerifiedUserAndLogin(email);
-            mvc.perform(post("/auth/reset-password").param("email", email));
+            requestPasswordReset(email);
             String otp = passwordResetOtp(email);
 
             assertThat(allAtOnce(() -> confirmPasswordReset(email, wrongOtp(otp)))).containsOnly(400);
@@ -123,7 +119,7 @@ class ConcurrentRequestTests extends IntegrationTest {
         for (int round = 0; round < ROUNDS; round++) {
             String email = uniqueEmail();
             registerVerifiedUserAndLogin(email);
-            mvc.perform(post("/auth/reset-password").param("email", email));
+            requestPasswordReset(email);
             String otp = passwordResetOtp(email);
 
             List<Integer> statuses = allAtOnce(() -> confirmPasswordReset(email, otp));
@@ -140,7 +136,7 @@ class ConcurrentRequestTests extends IntegrationTest {
             register(email, PASSWORD);
             String token = verificationToken(email);
 
-            List<Integer> statuses = allAtOnce(() -> verifyEmail(email, token).andReturn().getResponse().getStatus());
+            List<Integer> statuses = allAtOnce(() -> verifyEmail(token).andReturn().getResponse().getStatus());
 
             assertThat(statuses).containsOnly(200, 400);
             assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
@@ -159,8 +155,7 @@ class ConcurrentRequestTests extends IntegrationTest {
             }
             List<String> all = List.copyOf(emails);
 
-            assertThat(allAtOnce(() -> mvc.perform(post("/auth/reset-password").param("email", emails.remove()))
-                    .andReturn().getResponse().getStatus())).containsOnly(200);
+            assertThat(allAtOnce(() -> requestPasswordReset(emails.remove()).andReturn().getResponse().getStatus())).containsOnly(200);
             for (String email : all)
                 awaitEmail(email, "Password Reset");
         }
@@ -195,11 +190,7 @@ class ConcurrentRequestTests extends IntegrationTest {
     }
 
     private int confirmPasswordReset(String email, String otp) throws Exception {
-        return mvc.perform(post("/auth/reset-password").param("email", email)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"otp": "%s", "password": "N3w-Str0ng-Passw0rd!"}
-                        """.formatted(otp))).andReturn().getResponse().getStatus();
+        return confirmPasswordReset(email, otp, "N3w-Str0ng-Passw0rd!").andReturn().getResponse().getStatus();
     }
 
     private void assertSentOnce(String email, String subject) throws Exception {

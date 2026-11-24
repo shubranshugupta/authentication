@@ -28,5 +28,6 @@ spring:
         show-sql: true
 
 auth:
+    frontend-url: ${FRONTEND_URL:http://localhost:3000}
     mail:
         from: ${MAIL_FROM:noreply@authcore.local}

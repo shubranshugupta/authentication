@@ -3,7 +3,6 @@ package com.authcore.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,7 +10,6 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.IllegalTransactionStateException;
 
@@ -115,8 +113,7 @@ class OneTimeTokenTests extends IntegrationTest {
         requestReset(other);
 
         confirmReset(other, otp).andExpect(status().isBadRequest());
-        mvc.perform(get("/auth/verify-email").param("email", email).param("token", otp))
-                .andExpect(status().isBadRequest());
+        verifyEmail(otp).andExpect(status().isBadRequest());
 
         confirmReset(email, otp).andExpect(status().isOk());
     }
@@ -152,7 +149,7 @@ class OneTimeTokenTests extends IntegrationTest {
         String token = verificationToken(email);
         expire(email, TokenPurpose.EMAIL_VERIFICATION);
 
-        verifyEmail(email, token).andExpect(status().isBadRequest());
+        verifyEmail(token).andExpect(status().isBadRequest());
         assertThat(user(email).isEnabled()).isFalse();
     }
 
@@ -174,7 +171,7 @@ class OneTimeTokenTests extends IntegrationTest {
         String email = verifiedUser();
         String otp = requestReset(email);
 
-        askForReset(email).andExpect(status().isOk());
+        requestPasswordReset(email).andExpect(status().isOk());
 
         Thread.sleep(300); // nothing is sent, so there is nothing to wait for
         assertThat(sentEmails(email, "Password Reset")).hasSize(1);
@@ -201,11 +198,11 @@ class OneTimeTokenTests extends IntegrationTest {
         String first = verificationToken(email);
         waitOutTheCooldown(email, TokenPurpose.EMAIL_VERIFICATION);
 
-        mvc.perform(get("/auth/verify-email").param("email", email)).andExpect(status().isOk());
+        resendVerification(email).andExpect(status().isOk());
         awaitEmails(email, "Verify Email", 2);
 
-        verifyEmail(email, first).andExpect(status().isBadRequest());
-        verifyEmail(email, verificationToken(email)).andExpect(status().isOk());
+        verifyEmail(first).andExpect(status().isBadRequest());
+        verifyEmail(verificationToken(email)).andExpect(status().isOk());
     }
 
     /** Otherwise using up a code would be a way to send emails without a break. */
@@ -214,7 +211,7 @@ class OneTimeTokenTests extends IntegrationTest {
         String email = verifiedUser();
         confirmReset(email, requestReset(email)).andExpect(status().isOk());
 
-        askForReset(email).andExpect(status().isOk());
+        requestPasswordReset(email).andExpect(status().isOk());
 
         Thread.sleep(300);
         assertThat(sentEmails(email, "Password Reset")).hasSize(1);
@@ -253,30 +250,22 @@ class OneTimeTokenTests extends IntegrationTest {
         return email;
     }
 
-    private ResultActions askForReset(String email) throws Exception {
-        return mvc.perform(post("/auth/reset-password").param("email", email));
-    }
-
     /** Returns the code from the email. */
     private String requestReset(String email) throws Exception {
-        askForReset(email).andExpect(status().isOk());
+        requestPasswordReset(email).andExpect(status().isOk());
         return passwordResetOtp(email);
     }
 
     private String requestAnotherReset(String email) throws Exception {
         waitOutTheCooldown(email, TokenPurpose.PASSWORD_RESET);
         int sent = sentEmails(email, "Password Reset").size();
-        askForReset(email).andExpect(status().isOk());
+        requestPasswordReset(email).andExpect(status().isOk());
         awaitEmails(email, "Password Reset", sent + 1);
         return passwordResetOtp(email);
     }
 
     private ResultActions confirmReset(String email, String otp) throws Exception {
-        return mvc.perform(post("/auth/reset-password").param("email", email)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"otp": "%s", "password": "%s"}
-                        """.formatted(otp, NEW_PASSWORD)));
+        return confirmPasswordReset(email, otp, NEW_PASSWORD);
     }
 
     private Map<String, Object> row(String email, TokenPurpose purpose) {

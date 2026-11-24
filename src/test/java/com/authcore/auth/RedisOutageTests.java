@@ -1,7 +1,6 @@
 package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,7 +10,6 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.containers.GenericContainer;
 
 import com.authcore.auth.support.IntegrationTest;
@@ -47,9 +45,5 @@ class RedisOutageTests extends IntegrationTest {
         }
 
         refresh(refreshCookie).andExpect(status().isOk());
-    }
-
-    private ResultActions refresh(Cookie refreshCookie) throws Exception {
-        return mvc.perform(post("/auth/refresh").cookie(refreshCookie));
     }
 }

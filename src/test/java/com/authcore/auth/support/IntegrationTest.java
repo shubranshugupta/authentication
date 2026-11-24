@@ -88,30 +88,54 @@ public abstract class IntegrationTest {
     /** Registers a user, confirms the email, and returns an access token. */
     protected String registerVerifiedUserAndLogin(String email) throws Exception {
         register(email, PASSWORD).andExpect(status().isOk());
-        verifyEmail(email, verificationToken(email)).andExpect(status().isOk());
+        verifyEmail(verificationToken(email)).andExpect(status().isOk());
         return accessToken(email, PASSWORD);
     }
 
     // ---- endpoints -----------------------------------------------------------------
 
-    protected ResultActions register(String email, String password) throws Exception {
-        return mvc.perform(post("/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"firstName": "jane", "lastName": "doe", "email": "%s", "password": "%s"}
-                        """.formatted(email, password)));
+    protected ResultActions postJson(String path, String body) throws Exception {
+        return mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
-    protected ResultActions verifyEmail(String email, String token) throws Exception {
-        return mvc.perform(get("/auth/verify-email").param("email", email).param("token", token));
+    protected ResultActions register(String email, String password) throws Exception {
+        return postJson("/api/v1/auth/register", """
+                {"firstName": "jane", "lastName": "doe", "email": "%s", "password": "%s"}
+                """.formatted(email, password));
+    }
+
+    protected ResultActions resendVerification(String email) throws Exception {
+        return postJson("/api/v1/auth/email-verification", """
+                {"email": "%s"}
+                """.formatted(email));
+    }
+
+    protected ResultActions verifyEmail(String token) throws Exception {
+        return postJson("/api/v1/auth/email-verification/confirm", """
+                {"token": "%s"}
+                """.formatted(token));
+    }
+
+    protected ResultActions requestPasswordReset(String email) throws Exception {
+        return postJson("/api/v1/auth/password-reset", """
+                {"email": "%s"}
+                """.formatted(email));
+    }
+
+    protected ResultActions confirmPasswordReset(String email, String otp, String newPassword) throws Exception {
+        return postJson("/api/v1/auth/password-reset/confirm", """
+                {"email": "%s", "otp": "%s", "password": "%s"}
+                """.formatted(email, otp, newPassword));
     }
 
     protected ResultActions login(String email, String password) throws Exception {
-        return mvc.perform(post("/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"email": "%s", "password": "%s"}
-                        """.formatted(email, password)));
+        return postJson("/api/v1/auth/login", """
+                {"email": "%s", "password": "%s"}
+                """.formatted(email, password));
+    }
+
+    protected ResultActions refresh(Cookie refreshCookie) throws Exception {
+        return mvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie));
     }
 
     protected String accessToken(String email, String password) throws Exception {

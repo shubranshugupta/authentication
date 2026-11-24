@@ -1,8 +1,5 @@
 package com.authcore.auth.token;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-import java.net.URLEncoder;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -131,15 +128,15 @@ public class OneTimeTokenService {
         Map<String, Object> vars = new HashMap<>(); // not Map.of: the last name may be null
         vars.put("firstName", StringUtils.capitalize(user.getFirstName()));
         vars.put("lastName", StringUtils.capitalize(user.getLastName()));
-        vars.put("token", purpose.isLink() ? link(user, purpose, plain) : plain);
+        vars.put("token", purpose.isLink() ? link(purpose, plain) : plain);
         vars.put("validFor", purpose.validForText());
-        vars.put("baseUrl", properties.getBaseUrl());
+        vars.put("frontendUrl", properties.getFrontendUrl());
         return new EmailRequested(user.getEmail(), purpose.emailSubject, purpose.emailTemplate, vars);
     }
 
-    private String link(User user, TokenPurpose purpose, String plain) {
-        return properties.getBaseUrl() + purpose.page + "?token=" + plain + "&email="
-                + URLEncoder.encode(user.getEmail(), UTF_8);
+    /** The token alone: it says whose it is, and the email doesn't belong in a URL (H4). */
+    private String link(TokenPurpose purpose, String plain) {
+        return properties.frontendPage(purpose.page) + "?token=" + plain;
     }
 
     private static String randomCode() {

@@ -80,7 +80,7 @@ class MailDeliveryTests {
         String email = "mail-" + UUID.randomUUID() + "@example.com";
 
         // Verification email
-        mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                 {"firstName": "jane", "lastName": "doe", "email": "%s", "password": "%s"}
                 """.formatted(email, PASSWORD))).andExpect(status().isOk());
         Map<String, Object> verification = awaitMessage(email, "Verify Email");
@@ -90,13 +90,16 @@ class MailDeliveryTests {
         String token = link.group(1);
 
         // Password reset email
-        mvc.perform(get("/auth/verify-email").param("email", email).param("token", token))
-                .andExpect(status().isOk());
-        mvc.perform(post("/auth/reset-password").param("email", email)).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/email-verification/confirm").contentType(MediaType.APPLICATION_JSON).content("""
+                {"token": "%s"}
+                """.formatted(token))).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/password-reset").contentType(MediaType.APPLICATION_JSON).content("""
+                {"email": "%s"}
+                """.formatted(email))).andExpect(status().isOk());
         assertSentByAuthCore(awaitMessage(email, "Password Reset"));
 
         // Account deletion email
-        String body = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+        String body = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
                 {"email": "%s", "password": "%s"}
                 """.formatted(email, PASSWORD)))
                 .andExpect(status().isOk())

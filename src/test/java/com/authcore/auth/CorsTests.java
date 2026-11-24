@@ -22,7 +22,7 @@ class CorsTests extends IntegrationTest {
 
     @Test
     void preflightFromTheFrontendIsAllowedWithCredentials() throws Exception {
-        preflight(FRONTEND, "/auth/login", "POST", "Content-Type")
+        preflight(FRONTEND, "/api/v1/auth/login", "POST", "Content-Type")
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, FRONTEND))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
@@ -41,14 +41,14 @@ class CorsTests extends IntegrationTest {
 
     @Test
     void viteDevServerOriginIsAllowedToo() throws Exception {
-        preflight("http://localhost:5173", "/auth/login", "POST", "Content-Type")
+        preflight("http://localhost:5173", "/api/v1/auth/login", "POST", "Content-Type")
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"));
     }
 
     @Test
     void unknownOriginIsRejected() throws Exception {
-        preflight("https://evil.example", "/auth/login", "POST", "Content-Type")
+        preflight("https://evil.example", "/api/v1/auth/login", "POST", "Content-Type")
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }

@@ -3,6 +3,7 @@ package com.authcore.auth.common;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Base64;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -85,6 +86,32 @@ class AuthConfigPropertiesTests {
         token.setRefreshExpiration(-1);
 
         assertThat(VALIDATOR.validate(token)).hasSize(2);
+    }
+
+    /** H4: emails link to it, so a missing or wrong one must not go unnoticed. */
+    @Test
+    void theFrontendUrlMustBeAUrl() {
+        for (String valid : List.of("http://localhost:3000", "https://app.example.com", "https://example.com/app/"))
+            assertThat(frontendUrlProblems(valid)).as(valid).isEmpty();
+        // The first one is what an unset variable is bound as.
+        for (String invalid : List.of("${FRONTEND_URL}", "", "app.example.com", "javascript:alert(1)", "https://", "https://a.b?x=1", "https://a.b/#x"))
+            assertThat(frontendUrlProblems(invalid)).as(invalid)
+                    .containsExactly("auth.frontend-url (FRONTEND_URL) must be a URL like https://app.example.com");
+    }
+
+    @Test
+    void frontendPagesHaveOneSlash() {
+        for (String url : List.of("https://example.com/app", "https://example.com/app/")) {
+            AuthConfigProperties properties = new AuthConfigProperties();
+            properties.setFrontendUrl(url);
+            assertThat(properties.frontendPage("/verify-email")).isEqualTo("https://example.com/app/verify-email");
+        }
+    }
+
+    private static Set<String> frontendUrlProblems(String url) {
+        AuthConfigProperties properties = new AuthConfigProperties();
+        properties.setFrontendUrl(url);
+        return messages(VALIDATOR.validateProperty(properties, "frontendUrlValid"));
     }
 
     private static TokenConfigProperties token(String secretKey) {

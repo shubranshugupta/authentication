@@ -2,7 +2,6 @@ package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -170,23 +169,6 @@ class AccountManagementFlowTests extends IntegrationTest {
     }
 
     // ---- helpers -------------------------------------------------------------------
-
-    private ResultActions refresh(Cookie refreshCookie) throws Exception {
-        return mvc.perform(post("/auth/refresh").cookie(refreshCookie));
-    }
-
-    private ResultActions requestPasswordReset(String email) throws Exception {
-        return mvc.perform(post("/auth/reset-password").param("email", email));
-    }
-
-    private ResultActions confirmPasswordReset(String email, String otp, String newPassword) throws Exception {
-        return mvc.perform(post("/auth/reset-password")
-                .param("email", email)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"otp": "%s", "password": "%s"}
-                        """.formatted(otp, newPassword)));
-    }
 
     private ResultActions requestAccountDeletion(String accessToken) throws Exception {
         return mvc.perform(delete("/user/delete").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));

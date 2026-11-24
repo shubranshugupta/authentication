@@ -179,6 +179,6 @@ class EmailListenerTests extends IntegrationTest {
 
     private static EmailRequested email(String to, String subject, String template, String token) {
         return new EmailRequested(to, subject, template,
-                Map.of("firstName", "Jane", "lastName", "Doe", "token", token, "baseUrl", "http://localhost"));
+                Map.of("firstName", "Jane", "lastName", "Doe", "token", token, "frontendUrl", "http://localhost"));
     }
 }

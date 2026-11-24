@@ -9,12 +9,12 @@ import org.jspecify.annotations.Nullable;
  * email template, nothing else.
  */
 public enum TokenPurpose {
-    EMAIL_VERIFICATION(Duration.ofHours(24), "/auth/verify-email", "Verify Email", "verify_registration_email"),
+    EMAIL_VERIFICATION(Duration.ofHours(24), "/verify-email", "Verify Email", "verify_registration_email"),
     PASSWORD_RESET(Duration.ofMinutes(15), null, "Password Reset", "password_reset_email"),
     ACCOUNT_DELETION(Duration.ofMinutes(10), null, "Delete Account", "delete_account_email");
 
     final Duration validFor;
-    /** The page the emailed link opens. Without one, the email shows a code to type in. */
+    /** The page of the web app the emailed link opens. Without one, the email shows a code to type in. */
     final @Nullable String page;
     final String emailSubject;
     final String emailTemplate;

@@ -1,16 +1,15 @@
 package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
 
 import com.authcore.auth.support.IntegrationTest;
 
 /** H5: a request either changes everything it should, or nothing. */
 class TransactionTests extends IntegrationTest {
+    private static final String NEW_PASSWORD = "N3w-Str0ng-Passw0rd!";
 
     /** It used to leave an account nobody had a link for, and the email was taken. */
     @Test
@@ -29,22 +28,14 @@ class TransactionTests extends IntegrationTest {
     void aPasswordResetThatFailsHalfwayChangesNothing() throws Exception {
         String email = uniqueEmail();
         registerVerifiedUserAndLogin(email);
-        mvc.perform(post("/auth/reset-password").param("email", email)).andExpect(status().isOk());
+        requestPasswordReset(email).andExpect(status().isOk());
         String otp = passwordResetOtp(email);
 
-        withoutTable("refresh_tokens", () -> confirmReset(email, otp, 500));
+        withoutTable("refresh_tokens", () -> confirmPasswordReset(email, otp, NEW_PASSWORD).andExpect(status().isInternalServerError()));
 
         login(email, PASSWORD).andExpect(status().isOk());
-        confirmReset(email, otp, 200);
-        login(email, "N3w-Str0ng-Passw0rd!").andExpect(status().isOk());
-    }
-
-    private void confirmReset(String email, String otp, int expectedStatus) throws Exception {
-        mvc.perform(post("/auth/reset-password").param("email", email)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"otp": "%s", "password": "N3w-Str0ng-Passw0rd!"}
-                        """.formatted(otp))).andExpect(status().is(expectedStatus));
+        confirmPasswordReset(email, otp, NEW_PASSWORD).andExpect(status().isOk());
+        login(email, NEW_PASSWORD).andExpect(status().isOk());
     }
 
     /** Makes every statement on this table fail in the meantime. */
