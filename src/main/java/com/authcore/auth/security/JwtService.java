@@ -7,8 +7,6 @@ import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.common.AuthConfigProperties;
-import com.authcore.auth.token.InvalidTokenException;
-import com.authcore.auth.token.TokenExpireException;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;

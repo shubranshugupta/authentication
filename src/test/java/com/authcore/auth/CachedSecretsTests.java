@@ -1,7 +1,6 @@
 package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.Set;
@@ -22,8 +21,8 @@ class CachedSecretsTests extends IntegrationTest {
     void redisNeverHoldsPasswordHashesOrEntriesWithoutAnExpiry() throws Exception {
         String email = uniqueEmail();
         getProfile(registerVerifiedUserAndLogin(email)).andExpect(status().isOk());
-        mvc.perform(post("/auth/refresh").cookie(refreshCookie(email, PASSWORD))).andExpect(status().isOk());
-        mvc.perform(post("/auth/reset-password").param("email", email)).andExpect(status().isOk());
+        refresh(refreshCookie(email, PASSWORD)).andExpect(status().isOk());
+        requestPasswordReset(email).andExpect(status().isOk());
 
         String hash = user(email).getPassword();
         Set<String> keys = redis.keys("*");

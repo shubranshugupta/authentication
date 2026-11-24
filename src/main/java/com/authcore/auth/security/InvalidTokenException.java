@@ -1,4 +1,4 @@
-package com.authcore.auth.token;
+package com.authcore.auth.security;
 
 public class InvalidTokenException extends RuntimeException {
     public InvalidTokenException(String message) {

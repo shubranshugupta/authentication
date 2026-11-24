@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -17,23 +17,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.support.TransactionOperations;
 
 import com.authcore.auth.common.AuthConfigProperties;
+import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.session.RefreshToken;
 import com.authcore.auth.session.RefreshTokenService;
-import com.authcore.auth.token.InvalidTokenException;
-import com.authcore.auth.token.TokenAlreadyExistsException;
-import com.authcore.auth.token.TokenServiceFacade;
-import com.authcore.auth.token.TokenType;
+import com.authcore.auth.token.InvalidCodeException;
+import com.authcore.auth.token.OneTimeTokenService;
+import com.authcore.auth.token.TokenPurpose;
 import com.authcore.auth.user.Role;
 import com.authcore.auth.user.User;
 import com.authcore.auth.user.UserAlreadyExistsException;
@@ -55,7 +54,7 @@ class AuthServiceTests {
     @Mock
     private AuthenticationManager manager;
     @Mock
-    private TokenServiceFacade tokenService;
+    private OneTimeTokenService tokens;
 
     private final AuthConfigProperties properties = new AuthConfigProperties();
     private AuthService authService;
@@ -63,7 +62,7 @@ class AuthServiceTests {
     @BeforeEach
     void createService() {
         authService = new AuthService(userRepository, passwordEncoder, jwtService, refreshTokenService, manager,
-                tokenService, properties);
+                tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties);
     }
 
     // ---- registration --------------------------------------------------------------
@@ -72,27 +71,27 @@ class AuthServiceTests {
     void registerSavesADisabledUserWithAHashedPasswordAndSendsTheEmail() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
         when(passwordEncoder.encode("plain")).thenReturn("hash");
-        when(userRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(userRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
         authService.register(request());
 
-        User saved = savedUser();
+        User saved = registeredUser();
         assertThat(saved.getEmail()).isEqualTo(EMAIL);
         assertThat(saved.getPassword()).isEqualTo("hash");
         assertThat(saved.getRole()).isEqualTo(Role.USER);
         assertThat(saved.isEnabled()).isFalse();
-        verify(tokenService).createTokenAndSendMail(saved, TokenType.VERIFICATION_TOKEN);
+        verify(tokens).issue(saved.getId(), TokenPurpose.EMAIL_VERIFICATION);
     }
 
     @Test
     void registerGivesListedEmailsTheAdminRole() {
         properties.setAdminEmails(List.of("Jane@Example.com"));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-        when(userRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(userRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
         authService.register(request());
 
-        assertThat(savedUser().getRole()).isEqualTo(Role.ADMIN);
+        assertThat(registeredUser().getRole()).isEqualTo(Role.ADMIN);
     }
 
     @Test
@@ -100,14 +99,14 @@ class AuthServiceTests {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user(true)));
 
         assertThatThrownBy(() -> authService.register(request())).isInstanceOf(UserAlreadyExistsException.class);
-        verify(userRepository, never()).save(any());
-        verifyNoInteractions(tokenService);
+        verify(userRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(tokens);
     }
 
     @Test
     void registerRejectsAnEmailTakenAtTheSameMoment() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty(), Optional.of(user(false)));
-        when(userRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(userRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
 
         assertThatThrownBy(() -> authService.register(request())).isInstanceOf(UserAlreadyExistsException.class);
     }
@@ -115,7 +114,7 @@ class AuthServiceTests {
     @Test
     void registerDoesNotHideOtherDatabaseErrors() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-        when(userRepository.save(any())).thenThrow(new DataIntegrityViolationException("other constraint"));
+        when(userRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("other constraint"));
 
         assertThatThrownBy(() -> authService.register(request())).isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -162,82 +161,96 @@ class AuthServiceTests {
         authService.resendVerification(EMAIL);
         authService.requestPasswordReset(EMAIL);
 
-        verifyNoInteractions(tokenService);
+        verifyNoInteractions(tokens);
     }
 
     @Test
     void onlyUnverifiedAccountsGetTheVerificationEmailAgain() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user(true)));
         authService.resendVerification(EMAIL);
-        verifyNoInteractions(tokenService);
+        verifyNoInteractions(tokens);
 
         User unverified = user(false);
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(unverified));
         authService.resendVerification(EMAIL);
-        verify(tokenService).createTokenAndSendMail(unverified, TokenType.VERIFICATION_TOKEN);
+        verify(tokens).issue(unverified.getId(), TokenPurpose.EMAIL_VERIFICATION);
     }
 
     @Test
     void onlyVerifiedAccountsGetAResetCode() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user(false)));
         authService.requestPasswordReset(EMAIL);
-        verifyNoInteractions(tokenService);
+        verifyNoInteractions(tokens);
 
         User verified = user(true);
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(verified));
         authService.requestPasswordReset(EMAIL);
-        verify(tokenService).createTokenAndSendMail(verified, TokenType.RESET_PASSWORD_TOKEN);
+        verify(tokens).issue(verified.getId(), TokenPurpose.PASSWORD_RESET);
     }
 
     @Test
-    void askingAgainWhileACodeIsActiveIsNotAnError() {
+    void askingAgainDuringTheCooldownIsNotAnError() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user(true)));
-        when(tokenService.createTokenAndSendMail(any(), any())).thenThrow(new TokenAlreadyExistsException("active"));
+        when(tokens.issue(any(), any())).thenReturn(false);
 
         assertThatCode(() -> authService.requestPasswordReset(EMAIL)).doesNotThrowAnyException();
     }
 
     @Test
-    void aWrongTokenGetsTheSameAnswerAsAnUnknownAccount() {
+    void aWrongCodeGetsTheSameAnswerAsAnUnknownAccount() {
         when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("unverified@example.com")).thenReturn(Optional.of(user(false)));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user(true)));
-        doThrow(new InvalidTokenException("internal text")).when(tokenService).verifyToken(any(), any(), any());
+        when(tokens.consumeCode(any(), any(), any(), any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.resetPassword("unknown@example.com", "123456", "new"))
-                .isInstanceOf(InvalidTokenException.class).hasMessage(AuthService.INVALID_OTP);
-        assertThatThrownBy(() -> authService.resetPassword(EMAIL, "123456", "new"))
-                .isInstanceOf(InvalidTokenException.class).hasMessage(AuthService.INVALID_OTP);
+        for (String email : List.of("unknown@example.com", "unverified@example.com", EMAIL))
+            assertThatThrownBy(() -> authService.resetPassword(email, "12345678", "new"))
+                    .isInstanceOf(InvalidCodeException.class).hasMessage(AuthService.INVALID_CODE);
         verify(userRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder, refreshTokenService);
     }
 
     // ---- verification and reset ----------------------------------------------------
 
     @Test
-    void verifyEmailChecksTheTokenBeforeEnablingTheAccount() {
+    void verifyEmailEnablesTheAccountOfTheLink() {
         User user = user(false);
-        when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        when(tokens.consumeLink("token", TokenPurpose.EMAIL_VERIFICATION)).thenReturn(Optional.of(user));
 
-        authService.verifyEmail(EMAIL, "token");
+        authService.verifyEmail("token");
 
-        InOrder order = Mockito.inOrder(tokenService, userRepository);
-        order.verify(tokenService).verifyToken(user, "token", TokenType.VERIFICATION_TOKEN);
-        order.verify(userRepository).save(user);
-        assertThat(user.isEnabled()).isTrue();
+        assertThat(savedUser().isEnabled()).isTrue();
+    }
+
+    @Test
+    void verifyEmailRejectsAnInvalidLink() {
+        when(tokens.consumeLink(any(), any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.verifyEmail("token"))
+                .isInstanceOf(InvalidCodeException.class).hasMessage(AuthService.INVALID_VERIFICATION_LINK);
+        verify(userRepository, never()).save(any());
     }
 
     @Test
     void resetPasswordStoresTheHashAndDeletesTheRefreshToken() {
         User user = user(true);
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+        when(tokens.consumeCode(eq(1), eq("12345678"), eq(TokenPurpose.PASSWORD_RESET), any())).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("new")).thenReturn("new-hash");
 
-        authService.resetPassword(EMAIL, "123456", "new");
+        authService.resetPassword(" Jane@Example.com", "12345678", "new");
 
         assertThat(savedUser().getPassword()).isEqualTo("new-hash");
         verify(refreshTokenService).deleteRefreshToken(user);
     }
 
     // ---- helpers -------------------------------------------------------------------
+
+    private User registeredUser() {
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).saveAndFlush(saved.capture());
+        return saved.getValue();
+    }
 
     private User savedUser() {
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);

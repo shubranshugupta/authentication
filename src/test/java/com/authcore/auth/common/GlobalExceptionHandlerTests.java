@@ -13,9 +13,15 @@ import org.springframework.security.authentication.InternalAuthenticationService
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Errors the application doesn't expect: 500, with the details only in the server log (H2). */
+import jakarta.validation.constraints.Email;
+
+/**
+ * Errors no endpoint of the application has at the moment. Unexpected ones: 500, with the
+ * details only in the server log (H2).
+ */
 class GlobalExceptionHandlerTests {
     private static final String SECRET = "jdbc:mysql://internal-host/auth";
 
@@ -43,6 +49,22 @@ class GlobalExceptionHandlerTests {
         expectGeneric500("/not-writable");
     }
 
+    @Test
+    void missingParameter() throws Exception {
+        mvc.perform(get("/with-parameter"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MISSING_PARAMETER"))
+                .andExpect(jsonPath("$.detail").value("Required parameter 'email' is missing."));
+    }
+
+    @Test
+    void invalidParameter() throws Exception {
+        mvc.perform(get("/with-parameter").param("email", "not-an-email"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.errors.email").exists());
+    }
+
     private void expectGeneric500(String path) throws Exception {
         mvc.perform(get(path))
                 .andExpect(status().isInternalServerError())
@@ -67,6 +89,10 @@ class GlobalExceptionHandlerTests {
         @GetMapping("/login-broken")
         void loginBroken() {
             throw new InternalAuthenticationServiceException(SECRET);
+        }
+
+        @GetMapping("/with-parameter")
+        void withParameter(@RequestParam @Email String email) {
         }
 
         @GetMapping("/not-writable")

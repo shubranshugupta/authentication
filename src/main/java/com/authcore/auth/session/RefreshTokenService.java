@@ -10,8 +10,8 @@ import org.springframework.stereotype.Service;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.CacheService;
 import com.authcore.auth.common.DeadlockRetry;
-import com.authcore.auth.token.InvalidTokenException;
-import com.authcore.auth.token.TokenExpireException;
+import com.authcore.auth.security.InvalidTokenException;
+import com.authcore.auth.security.TokenExpireException;
 import com.authcore.auth.user.User;
 import com.authcore.auth.user.UserRepository;
 

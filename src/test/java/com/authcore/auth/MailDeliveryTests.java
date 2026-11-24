@@ -2,7 +2,6 @@ package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,8 +33,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import com.authcore.auth.support.TestcontainersConfiguration;
-import com.authcore.auth.token.VerificationTokenRepository;
-import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 
 /**
@@ -73,12 +72,6 @@ class MailDeliveryTests {
     @Autowired
     private MockMvc mvc;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private VerificationTokenRepository verificationTokenRepository;
-
     private final HttpClient http = HttpClient.newHttpClient();
 
     @Test
@@ -86,29 +79,32 @@ class MailDeliveryTests {
         String email = "mail-" + UUID.randomUUID() + "@example.com";
 
         // Verification email
-        mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
                 {"firstName": "jane", "lastName": "doe", "email": "%s", "password": "%s"}
                 """.formatted(email, PASSWORD))).andExpect(status().isOk());
         Map<String, Object> verification = awaitMessage(email, "Verify Email");
-        String token = verificationTokenRepository
-                .findByUser(userRepository.findByEmail(email).orElseThrow()).orElseThrow().getToken();
         assertSentByAuthCore(verification);
-        assertThat((String) verification.get("HTML")).contains(token);
+        Matcher link = Pattern.compile("token=([A-Za-z0-9_-]{43})").matcher((String) verification.get("HTML"));
+        assertThat(link.find()).isTrue();
+        String token = link.group(1);
 
         // Password reset email
-        mvc.perform(get("/auth/verify-email").param("email", email).param("token", token))
-                .andExpect(status().isOk());
-        mvc.perform(post("/auth/reset-password").param("email", email)).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/email-verification/confirm").contentType(MediaType.APPLICATION_JSON).content("""
+                {"token": "%s"}
+                """.formatted(token))).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/password-reset").contentType(MediaType.APPLICATION_JSON).content("""
+                {"email": "%s"}
+                """.formatted(email))).andExpect(status().isOk());
         assertSentByAuthCore(awaitMessage(email, "Password Reset"));
 
         // Account deletion email
-        String body = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+        String body = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
                 {"email": "%s", "password": "%s"}
                 """.formatted(email, PASSWORD)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String accessToken = JsonPath.read(body, "$.accessToken");
-        mvc.perform(delete("/user/delete").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+        mvc.perform(post("/api/v1/users/me/deletion").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk());
         assertSentByAuthCore(awaitMessage(email, "Delete Account"));
     }

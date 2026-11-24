@@ -1,9 +1,14 @@
 package com.authcore.auth.user;
 
+import org.jspecify.annotations.Nullable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.authcore.auth.token.TokenServiceFacade;
-import com.authcore.auth.token.TokenType;
+import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.token.InvalidCodeException;
+import com.authcore.auth.token.OneTimeTokenService;
+import com.authcore.auth.token.TokenAlreadyExistsException;
+import com.authcore.auth.token.TokenPurpose;
 
 import lombok.RequiredArgsConstructor;
 
@@ -12,7 +17,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
-    private final TokenServiceFacade tokenService;
+    private final OneTimeTokenService tokens;
+    private final RetryingTransaction transaction;
+    private final PasswordEncoder passwordEncoder;
 
     public UserResponse getProfile(Integer userId) {
         User user = getUser(userId);
@@ -23,21 +30,36 @@ public class UserService {
                 .build();
     }
 
-    public void updateProfile(Integer userId, String firstName, String lastName) {
+    /** Null means: keep it. An empty last name removes it. */
+    public void updateProfile(Integer userId, @Nullable String firstName, @Nullable String lastName) {
         User user = getUser(userId);
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
+        if (firstName != null)
+            user.setFirstName(firstName);
+        if (lastName != null)
+            user.setLastName(lastName.isBlank() ? null : lastName);
         userRepository.save(user);
     }
 
     public void requestDeletion(Integer userId) {
-        tokenService.createTokenAndSendMail(getUser(userId), TokenType.DELETE_ACCOUNT_TOKEN);
+        if (!tokens.issue(getUser(userId).getId(), TokenPurpose.ACCOUNT_DELETION))
+            throw new TokenAlreadyExistsException("A code was sent less than a minute ago. Check your inbox, or try again in a minute.");
     }
 
-    public void confirmDeletion(Integer userId, String otp) {
-        User user = getUser(userId);
-        tokenService.verifyToken(user, otp, TokenType.DELETE_ACCOUNT_TOKEN);
-        userRepository.delete(user);
+    /**
+     * Deletes the account, and with it every token. Needs the password too (H8): whoever
+     * got hold of a session and the inbox must not be able to delete the account. A wrong
+     * password uses up one of the code's attempts, so it can't be guessed here either.
+     */
+    public void confirmDeletion(Integer userId, String code, String password) {
+        boolean deleted = transaction.run(() -> tokens
+                .consumeCode(userId, code, TokenPurpose.ACCOUNT_DELETION,
+                        user -> passwordEncoder.matches(password, user.getPassword()))
+                .map(user -> {
+                    userRepository.delete(user);
+                    return true;
+                }).orElse(false));
+        if (!deleted)
+            throw new InvalidCodeException("The code or the password is wrong, or the code has expired.");
     }
 
     private User getUser(Integer userId) {

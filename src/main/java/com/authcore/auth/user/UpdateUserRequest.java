@@ -1,6 +1,6 @@
 package com.authcore.auth.user;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,10 +12,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UpdateUserRequest {
-    @NotBlank
+    /** Left out: keep it. */
+    @Pattern(regexp = "(?s).*\\S.*", message = "must not be blank")
     @Size(max = 100)
     private String firstName;
 
+    /** Left out: keep it. Empty: remove it. */
     @Size(max = 100)
     private String lastName;
 }

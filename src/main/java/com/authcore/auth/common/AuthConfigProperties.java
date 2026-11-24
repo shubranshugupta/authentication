@@ -1,5 +1,7 @@
 package com.authcore.auth.common;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -7,6 +9,7 @@ import java.util.Set;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
 import io.jsonwebtoken.io.Decoders;
@@ -25,7 +28,27 @@ import lombok.ToString;
 @Configuration
 @ConfigurationProperties("auth")
 public class AuthConfigProperties {
-    private String baseUrl;
+    /**
+     * Where the web app runs. Emails link to its pages, so it's validated at startup: an
+     * unset FRONTEND_URL would otherwise only show up as broken links.
+     */
+    private String frontendUrl;
+
+    @AssertTrue(message = "auth.frontend-url (FRONTEND_URL) must be a URL like https://app.example.com")
+    public boolean isFrontendUrlValid() {
+        try {
+            URI url = new URI(String.valueOf(frontendUrl));
+            return ("https".equals(url.getScheme()) || "http".equals(url.getScheme())) && url.getHost() != null
+                    && url.getQuery() == null && url.getFragment() == null;
+        } catch (URISyntaxException e) {
+            return false;
+        }
+    }
+
+    /** A page of the web app, e.g. "/verify-email". */
+    public String frontendPage(String path) {
+        return StringUtils.trimTrailingCharacter(frontendUrl, '/') + path;
+    }
 
     /**
      * Emails that get the ADMIN role: at registration, and for existing users at
@@ -62,8 +85,6 @@ public class AuthConfigProperties {
         private long jwtExpiration;
         @Positive
         private long refreshExpiration;
-        @Positive
-        private long tokenExpiration;
 
         // A check on a boolean, not on the field: the startup error prints the rejected
         // value, and that must not be the key.

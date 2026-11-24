@@ -1,13 +1,12 @@
 # Authentication System
 
-This project is a comprehensive authentication system built using Spring Boot. It incorporates multiple authentication mechanisms, including JWT tokens, OTP for two-factor authentication, password reset functionality, and email notifications. The system is designed following best practices, including SOLID principles, DRY, and design patterns for flexibility and scalability. It also includes role-based access control to manage user permissions.
+This project is a comprehensive authentication system built using Spring Boot. It covers registration with email verification, login with JWT access tokens, password reset and account deletion with emailed codes, and email notifications. The system is designed following best practices, including SOLID principles, DRY, and design patterns for flexibility and scalability. It also includes role-based access control to manage user permissions.
 
 ## Features
 
 - JWT Authentication: Secure authentication using JSON Web Tokens (JWT) for stateless sessions.
 - Role-Based Access Control: Different roles for users to manage access to various parts of the application.
-- Two-Factor Authentication (2FA): Adds an additional layer of security using OTP (One-Time Password).
-- Password Reset: Allows users to reset their password via email.
+- Emailed Codes and Links: Verify an email, reset a password or delete an account. They are stored only as hashes, work once, expire, and stop working after 5 wrong guesses.
 - Email Notifications: Sends emails for new user registrations, password resets, and other significant events.
 - Logging: Comprehensive logging to monitor the application and track issues.
 - Caching: Uses Redis to cache refresh tokens (ids and expiry only, never users or passwords).
@@ -72,11 +71,11 @@ NOTE: The application will start at `http://localhost:8080`.
 | Profile | How it's selected | Settings come from |
 |---|---|---|
 | `dev` | the default | environment variables, then `./env.properties`, then defaults matching `docker-compose.yml`. SQL logging is on. |
-| `prod` | `SPRING_PROFILES_ACTIVE=prod` | environment variables only. There are no defaults for hosts or credentials: set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `APP_BASE_URL`. |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod` | environment variables only. There are no defaults for hosts or credentials: set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `FRONTEND_URL`. |
 
 ### Database Migrations
 
-The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V4__...sql`, `V5__...sql`, ...). Never edit a migration that has already run.
+The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V5__...sql`, `V6__...sql`, ...). Never edit a migration that has already run.
 
 ### Running the Tests
 
@@ -94,7 +93,7 @@ Packages under `com.authcore.auth` are grouped by feature:
 |---|---|
 | `auth` | registration, login, email verification, password reset |
 | `user` | users, profile, account deletion, admin API |
-| `token` | one-time tokens and codes sent by email |
+| `token` | the codes and links sent by email |
 | `session` | refresh tokens |
 | `security` | Spring Security setup, access tokens (JWT) |
 | `notification` | emails |
@@ -102,14 +101,45 @@ Packages under `com.authcore.auth` are grouped by feature:
 
 ## API Endpoints
 
-1. User Registration: `POST /auth/register`
-2. User Login: `POST /auth/login`
-3. Refresh Token: `POST /auth/refresh`
-4. Verify Email: `GET /auth/verify-email?token=token&email=email`
-5. Password Reset Request: `POST /auth/reset-password?email=email`
-6. Get User Profile: `GET /user/get-info`
-7. Update User Profile: `PUT /user/update-info`
-8. Delete User: `DELETE /user/delete`
+### Authentication
+
+| Endpoint | Body | What it does |
+|---|---|---|
+| `POST /api/v1/auth/register` | `firstName`, `lastName` (optional), `email`, `password` | Creates the account and emails a verification link |
+| `POST /api/v1/auth/email-verification` | `email` | Emails a new verification link |
+| `POST /api/v1/auth/email-verification/confirm` | `token` | Verifies the email with the token from the link |
+| `POST /api/v1/auth/login` | `email`, `password` | Returns an access token, and sets the refresh token as a cookie |
+| `POST /api/v1/auth/refresh` | (refresh cookie) | Returns a new access token |
+| `POST /api/v1/auth/password-reset` | `email` | Emails a reset code |
+| `POST /api/v1/auth/password-reset/confirm` | `email`, `otp`, `password` | Sets the new password |
+
+### The Logged-in User
+
+These need the access token: `Authorization: Bearer <token>`.
+
+| Endpoint | Body | What it does |
+|---|---|---|
+| `GET /api/v1/users/me` | | Returns the profile |
+| `PATCH /api/v1/users/me` | `firstName`, `lastName` (both optional) | Changes what is given. An empty `lastName` removes it |
+| `POST /api/v1/users/me/deletion` | | Emails a deletion code |
+| `POST /api/v1/users/me/deletion/confirm` | `otp`, `password` | Deletes the account |
+
+### Codes and Links
+
+| Email | Contains | Valid for |
+|---|---|---|
+| Verify Email | a link to `FRONTEND_URL/verify-email?token=...` | 24 hours |
+| Password Reset | an 8-digit code | 15 minutes |
+| Delete Account | an 8-digit code | 10 minutes |
+
+- The link opens a page of your web app (`FRONTEND_URL`, `http://localhost:3000` in development). That page must send the `token` to `POST /api/v1/auth/email-verification/confirm`. Without a web app, copy the token from the email in Mailpit and send it yourself:
+
+  ```bash
+  curl -X POST http://localhost:8080/api/v1/auth/email-verification/confirm \
+    -H "Content-Type: application/json" -d '{"token": "..."}'
+  ```
+- A new code or link can be requested after 60 seconds, and replaces the old one. For the public endpoints, requests made sooner get the usual answer but send nothing; the deletion endpoint answers `409`.
+- After 5 wrong guesses a code stops working. Request a new one.
 
 ### Input Rules
 
@@ -144,7 +174,7 @@ Every error is a `ProblemDetail` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9
   "title": "Unauthorized",
   "status": 401,
   "detail": "The access token has expired.",
-  "instance": "/user/get-info",
+  "instance": "/api/v1/users/me",
   "code": "TOKEN_EXPIRED",
   "msg": "Token has expired"
 }
@@ -152,12 +182,12 @@ Every error is a `ProblemDetail` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9
 
 | Status | Codes |
 |---|---|
-| 400 | `INVALID_INPUT` (with `errors`), `MALFORMED_BODY`, `MISSING_PARAMETER`, `INVALID_PARAMETER`, `MISSING_COOKIE`, `BAD_REQUEST` |
+| 400 | `INVALID_INPUT` (with `errors`), `MALFORMED_BODY`, `MISSING_PARAMETER`, `INVALID_PARAMETER`, `MISSING_COOKIE`, `INVALID_CODE` (a code or link is wrong, expired or used), `BAD_REQUEST` |
 | 401 | `AUTHENTICATION_REQUIRED` (no token), `INVALID_TOKEN`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` |
 | 403 | `ACCOUNT_DISABLED` (email not verified), `ACCESS_DENIED` |
 | 404 | `NOT_FOUND`, `USER_NOT_FOUND` |
 | 405, 406, 415 | `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
-| 409 | `USER_ALREADY_EXISTS`, `TOKEN_ALREADY_EXISTS` (a code was already sent) |
+| 409 | `USER_ALREADY_EXISTS`, `TOKEN_ALREADY_EXISTS` (a code was sent less than a minute ago) |
 | 500 | `INTERNAL_ERROR`. The details are only in the server log. |
 
 ## Contributing

@@ -1,11 +1,10 @@
 package com.authcore.auth.user;
 
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,31 +16,34 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/v1/users/me")
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
 
-    @GetMapping("/get-info")
+    @GetMapping
     public ResponseEntity<UserResponse> getUserInfo(@AuthenticationPrincipal UserPrincipal me) {
         return ResponseEntity.ok(userService.getProfile(me.id()));
     }
 
-    @PutMapping("/update-info")
+    @PatchMapping
     public ResponseEntity<MsgResponse> updateUser(@AuthenticationPrincipal UserPrincipal me,
             @Valid @RequestBody UpdateUserRequest newInfo) {
         userService.updateProfile(me.id(), newInfo.getFirstName(), newInfo.getLastName());
         return message("User info updated successfully.");
     }
 
-    @DeleteMapping("/delete")
+    @PostMapping("/deletion")
+    public ResponseEntity<MsgResponse> requestDeletion(@AuthenticationPrincipal UserPrincipal me) {
+        userService.requestDeletion(me.id());
+        return message("Delete account email sent.");
+    }
+
+    /** A POST, because some proxies and clients drop the body of a DELETE (H8). */
+    @PostMapping("/deletion/confirm")
     public ResponseEntity<MsgResponse> deleteUser(@AuthenticationPrincipal UserPrincipal me,
-            @Valid @RequestBody(required = false) @Nullable DeleteAccountRequest request) {
-        if (request == null) {
-            userService.requestDeletion(me.id());
-            return message("Delete account email sent.");
-        }
-        userService.confirmDeletion(me.id(), String.valueOf(request.getOtp()));
+            @Valid @RequestBody DeleteAccountRequest request) {
+        userService.confirmDeletion(me.id(), request.getOtp(), request.getPassword());
         return message("User deleted successfully.");
     }
 

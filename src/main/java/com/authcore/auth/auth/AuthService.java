@@ -8,14 +8,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.common.AuthConfigProperties;
-import com.authcore.auth.common.DeadlockRetry;
 import com.authcore.auth.common.EmailAddresses;
+import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.session.RefreshTokenService;
-import com.authcore.auth.token.InvalidTokenException;
-import com.authcore.auth.token.TokenAlreadyExistsException;
-import com.authcore.auth.token.TokenServiceFacade;
-import com.authcore.auth.token.TokenType;
+import com.authcore.auth.token.InvalidCodeException;
+import com.authcore.auth.token.OneTimeTokenService;
+import com.authcore.auth.token.TokenPurpose;
 import com.authcore.auth.user.Role;
 import com.authcore.auth.user.User;
 import com.authcore.auth.user.UserAlreadyExistsException;
@@ -30,14 +29,15 @@ public class AuthService {
     // H2: the same text whether the account doesn't exist, is in the wrong state, or the
     // token is wrong, so the answer can't be used to find out which emails are registered.
     static final String INVALID_VERIFICATION_LINK = "This verification link is invalid or has expired. If your email is already verified, you can log in.";
-    static final String INVALID_OTP = "The code is invalid or has expired.";
+    static final String INVALID_CODE = "The code is invalid or has expired.";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager manager;
-    private final TokenServiceFacade tokenService;
+    private final OneTimeTokenService tokens;
+    private final RetryingTransaction transaction;
     private final AuthConfigProperties authConfigProperties;
 
     public void register(RegisterRequest request) {
@@ -45,16 +45,28 @@ public class AuthService {
         if (userRepository.findByEmail(email).isPresent())
             throw new UserAlreadyExistsException(email + " already exists");
 
-        User saved = saveNewUser(User.builder()
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .email(email)
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(authConfigProperties.isAdminEmail(email) ? Role.ADMIN : Role.USER)
-                .enabled(false)
-                .build());
-
-        tokenService.createTokenAndSendMail(saved, TokenType.VERIFICATION_TOKEN);
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+        try {
+            // The account and its link together: an account without a link, if the second
+            // step failed, would only keep the email taken (H5).
+            transaction.run(() -> {
+                User saved = userRepository.saveAndFlush(User.builder()
+                        .firstName(request.getFirstName())
+                        .lastName(request.getLastName())
+                        .email(email)
+                        .password(passwordHash)
+                        .role(authConfigProperties.isAdminEmail(email) ? Role.ADMIN : Role.USER)
+                        .enabled(false)
+                        .build());
+                return tokens.issue(saved.getId(), TokenPurpose.EMAIL_VERIFICATION);
+            });
+        } catch (DataIntegrityViolationException e) {
+            // The same email was registered at the same moment, and the unique constraint
+            // rejected this one.
+            if (userRepository.findByEmail(email).isEmpty())
+                throw e;
+            throw new UserAlreadyExistsException(email + " already exists");
+        }
     }
 
     public TokenPair login(String email, String password) {
@@ -82,79 +94,43 @@ public class AuthService {
     public void resendVerification(String email) {
         userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(user -> !user.isEnabled())
-                .ifPresent(user -> sendTokenUnlessOneIsActive(user, TokenType.VERIFICATION_TOKEN));
+                .ifPresent(user -> tokens.issue(user.getId(), TokenPurpose.EMAIL_VERIFICATION));
     }
 
-    public void verifyEmail(String email, String token) {
-        User user = userRepository.findByEmail(EmailAddresses.normalize(email))
-                .filter(found -> !found.isEnabled())
-                .orElseThrow(() -> new InvalidTokenException(INVALID_VERIFICATION_LINK));
-
-        verifyToken(user, token, TokenType.VERIFICATION_TOKEN, INVALID_VERIFICATION_LINK);
-
-        user.setEnabled(true);
-        userRepository.save(user);
+    public void verifyEmail(String token) {
+        boolean verified = transaction.run(() -> tokens.consumeLink(token, TokenPurpose.EMAIL_VERIFICATION)
+                .map(user -> {
+                    user.setEnabled(true);
+                    userRepository.save(user);
+                    return true;
+                }).orElse(false));
+        if (!verified)
+            throw new InvalidCodeException(INVALID_VERIFICATION_LINK);
     }
 
     /** Sends a password reset code, if there is a verified account with this email. */
     public void requestPasswordReset(String email) {
         userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(User::isEnabled)
-                .ifPresent(user -> sendTokenUnlessOneIsActive(user, TokenType.RESET_PASSWORD_TOKEN));
+                .ifPresent(user -> tokens.issue(user.getId(), TokenPurpose.PASSWORD_RESET));
     }
 
-    public void resetPassword(String email, String otp, String newPassword) {
-        User user = userRepository.findByEmail(EmailAddresses.normalize(email))
+    public void resetPassword(String email, String code, String newPassword) {
+        User account = userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(User::isEnabled)
-                .orElseThrow(() -> new InvalidTokenException(INVALID_OTP));
+                .orElseThrow(() -> new InvalidCodeException(INVALID_CODE));
 
-        verifyToken(user, otp, TokenType.RESET_PASSWORD_TOKEN, INVALID_OTP);
-
-        user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
-        // Whoever knew the old password may hold the refresh token. (The copy in the
-        // Redis cache goes in Phase 5, C2.)
-        refreshTokenService.deleteRefreshToken(user);
-    }
-
-    /**
-     * Saves a new user. If the same email was registered at the same moment, the
-     * unique constraint rejects this one, and it gets the usual "already exists".
-     */
-    private User saveNewUser(User user) {
-        try {
-            return DeadlockRetry.run(() -> userRepository.save(user));
-        } catch (DataIntegrityViolationException e) {
-            if (userRepository.findByEmail(user.getEmail()).isEmpty())
-                throw e;
-            throw new UserAlreadyExistsException(user.getEmail() + " already exists");
-        }
-    }
-
-    /**
-     * Checks a token, and gives a wrong one exactly the answer an unknown account
-     * gets. With its own message, one made-up token showed whether the account
-     * exists (H2).
-     */
-    private void verifyToken(User user, String token, TokenType tokenType, String invalidMessage) {
-        try {
-            tokenService.verifyToken(user, token, tokenType);
-        } catch (InvalidTokenException e) {
-            throw new InvalidTokenException(invalidMessage, e);
-        }
-    }
-
-    /**
-     * Sends a new token, unless an unexpired one was already sent. That case used to
-     * return 409, which revealed that the account exists (H2). The user still has to
-     * wait for the old token to expire; H3 (Phase 4) replaces this with a short
-     * resend cooldown.
-     */
-    private void sendTokenUnlessOneIsActive(User user, TokenType tokenType) {
-        try {
-            tokenService.createTokenAndSendMail(user, tokenType);
-        } catch (TokenAlreadyExistsException e) {
-            // already sent; same answer either way
-        }
+        boolean reset = transaction.run(() -> tokens
+                .consumeCode(account.getId(), code, TokenPurpose.PASSWORD_RESET, user -> true)
+                .map(user -> {
+                    user.setPassword(passwordEncoder.encode(newPassword));
+                    userRepository.save(user);
+                    // Whoever knew the old password may hold the refresh token. (The copy in
+                    // the Redis cache goes in Phase 5, C2.)
+                    refreshTokenService.deleteRefreshToken(user);
+                    return true;
+                }).orElse(false));
+        if (!reset)
+            throw new InvalidCodeException(INVALID_CODE);
     }
 }

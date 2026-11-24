@@ -42,31 +42,20 @@ class ErrorResponseTests extends IntegrationTest {
 
     @Test
     void invalidFields() throws Exception {
-        expect(400, "INVALID_INPUT", json(post("/auth/register"), "{}"))
+        expect(400, "INVALID_INPUT", json(post("/api/v1/auth/register"), "{}"))
                 .andExpect(jsonPath("$.errors.email").exists())
                 .andExpect(jsonPath("$.errors.password").exists());
     }
 
     @Test
-    void invalidQueryParameter() throws Exception {
-        expect(400, "INVALID_INPUT", post("/auth/reset-password").param("email", "not-an-email"))
-                .andExpect(jsonPath("$.errors.email").exists());
-    }
-
-    @Test
     void brokenJson() throws Exception {
-        expect(400, "MALFORMED_BODY", json(post("/auth/login"), "{\"email\": "))
+        expect(400, "MALFORMED_BODY", json(post("/api/v1/auth/login"), "{\"email\": "))
                 .andExpect(jsonPath("$.detail").value("The request body is missing or isn't valid JSON."));
     }
 
     @Test
-    void missingParameter() throws Exception {
-        expect(400, "MISSING_PARAMETER", post("/auth/reset-password"));
-    }
-
-    @Test
     void missingCookie() throws Exception {
-        expect(400, "MISSING_COOKIE", post("/auth/refresh"));
+        expect(400, "MISSING_COOKIE", post("/api/v1/auth/refresh"));
     }
 
     @Test
@@ -77,32 +66,32 @@ class ErrorResponseTests extends IntegrationTest {
 
     @Test
     void unknownPath() throws Exception {
-        expect(404, "NOT_FOUND", get("/auth/no-such-endpoint"));
+        expect(404, "NOT_FOUND", get("/api/v1/auth/no-such-endpoint"));
     }
 
     @Test
     void wrongMethodNamesTheAllowedOnes() throws Exception {
-        expect(405, "METHOD_NOT_ALLOWED", delete("/auth/login"))
+        expect(405, "METHOD_NOT_ALLOWED", delete("/api/v1/auth/login"))
                 .andExpect(header().string(HttpHeaders.ALLOW, "POST"));
     }
 
     @Test
     void wrongContentType() throws Exception {
         expect(415, "UNSUPPORTED_MEDIA_TYPE",
-                post("/auth/login").contentType(MediaType.TEXT_PLAIN).content("hello"));
+                post("/api/v1/auth/login").contentType(MediaType.TEXT_PLAIN).content("hello"));
     }
 
     // ---- login and tokens ----------------------------------------------------------
 
     @Test
     void noToken() throws Exception {
-        expect(401, "AUTHENTICATION_REQUIRED", get("/user/get-info"));
+        expect(401, "AUTHENTICATION_REQUIRED", get("/api/v1/users/me"));
     }
 
     /** A browser page load asks for HTML; the error must still be readable. */
     @Test
     void noTokenAndAClientThatWantsHtml() throws Exception {
-        expect(401, "AUTHENTICATION_REQUIRED", get("/user/get-info").accept(MediaType.TEXT_HTML));
+        expect(401, "AUTHENTICATION_REQUIRED", get("/api/v1/users/me").accept(MediaType.TEXT_HTML));
     }
 
     @Test
@@ -111,14 +100,22 @@ class ErrorResponseTests extends IntegrationTest {
                 .expiration(Date.from(Instant.now().minusSeconds(60)))
                 .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret)), Jwts.SIG.HS256).compact();
 
-        expect(401, "TOKEN_EXPIRED", as(expired, get("/user/get-info")))
+        expect(401, "TOKEN_EXPIRED", as(expired, get("/api/v1/users/me")))
                 .andExpect(jsonPath("$.detail").value("The access token has expired."));
+    }
+
+    /** 400, not 401: a client that gets 401 would try to refresh its login. */
+    @Test
+    void wrongCode() throws Exception {
+        expect(400, "INVALID_CODE", json(post("/api/v1/auth/password-reset/confirm"),
+                "{\"email\": \"nobody@example.com\", \"otp\": \"12345678\", \"password\": \"Twelve-char1\"}"));
+        expect(400, "INVALID_CODE", json(post("/api/v1/auth/email-verification/confirm"), "{\"token\": \"x\"}"));
     }
 
     @Test
     void wrongPassword() throws Exception {
         expect(401, "INVALID_CREDENTIALS",
-                json(post("/auth/login"), "{\"email\": \"nobody@example.com\", \"password\": \"x\"}"));
+                json(post("/api/v1/auth/login"), "{\"email\": \"nobody@example.com\", \"password\": \"x\"}"));
     }
 
     @Test
@@ -137,8 +134,8 @@ class ErrorResponseTests extends IntegrationTest {
     @Test
     void codeAlreadySent() throws Exception {
         String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
-        mvc.perform(as(accessToken, delete("/user/delete"))).andExpect(status().isOk());
-        expect(409, "TOKEN_ALREADY_EXISTS", as(accessToken, delete("/user/delete")));
+        mvc.perform(as(accessToken, post("/api/v1/users/me/deletion"))).andExpect(status().isOk());
+        expect(409, "TOKEN_ALREADY_EXISTS", as(accessToken, post("/api/v1/users/me/deletion")));
     }
 
     // ---- users ---------------------------------------------------------------------
@@ -171,10 +168,6 @@ class ErrorResponseTests extends IntegrationTest {
 
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder request, String body) {
         return request.contentType(MediaType.APPLICATION_JSON).content(body);
-    }
-
-    private static MockHttpServletRequestBuilder as(String accessToken, MockHttpServletRequestBuilder request) {
-        return request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
     }
 
     private String admin() throws Exception {

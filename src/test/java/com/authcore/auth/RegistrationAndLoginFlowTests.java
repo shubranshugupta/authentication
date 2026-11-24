@@ -50,7 +50,7 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
 
         MimeMessage verificationEmail = awaitEmail(email, "Verify Email");
         assertThat(htmlBody(verificationEmail))
-                .contains(verificationToken(email))
+                .contains("https://app.authcore.test/verify-email?token=" + verificationToken(email) + "\"")
                 .contains("cid:authcoreLogo")
                 .contains("AuthCore");
 
@@ -81,26 +81,56 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
         String email = uniqueEmail();
         register(email, PASSWORD).andExpect(status().isOk());
 
-        verifyEmail(email, verificationToken(email))
+        verifyEmail(verificationToken(email))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.msg").value("Email verified successfully"));
 
         assertThat(user(email).isEnabled()).isTrue();
-        assertThat(verificationTokenRepository.findByUser(user(email))).isEmpty();
 
-        // Using the link again: the same 401 as any invalid link. It used to answer
+        // Using the link again: the same answer as for any invalid link. It used to be
         // "Email already verified", which told anyone whether an email was verified (H2).
-        verifyEmail(email, "any-token").andExpect(status().isUnauthorized());
+        verifyEmail(verificationToken(email)).andExpect(status().isBadRequest());
     }
 
     @Test
-    void verifyingWithAWrongTokenReturns401AndLeavesTheAccountDisabled() throws Exception {
+    void verifyingWithAWrongTokenReturns400AndLeavesTheAccountDisabled() throws Exception {
         String email = uniqueEmail();
         register(email, PASSWORD).andExpect(status().isOk());
 
-        verifyEmail(email, "not-the-real-token").andExpect(status().isUnauthorized());
+        verifyEmail("not-the-real-token")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CODE"));
 
         assertThat(user(email).isEnabled()).isFalse();
+    }
+
+    /** H4: the link failed for these addresses, because the email was part of it. */
+    @Test
+    void theLinkWorksForAnAddressWithSpecialCharacters() throws Exception {
+        String email = "jane+tag&x=%41'" + uniqueEmail();
+        register(email, PASSWORD).andExpect(status().isOk());
+
+        assertThat(htmlBody(awaitEmail(email, "Verify Email"))).doesNotContain("email=");
+        verifyEmail(verificationToken(email)).andExpect(status().isOk());
+
+        login(email, PASSWORD).andExpect(status().isOk());
+    }
+
+    /** H4 and A6: opening a URL must not change anything. */
+    @Test
+    void theOldEndpointsAreGone() throws Exception {
+        String email = uniqueEmail();
+        register(email, PASSWORD).andExpect(status().isOk());
+        String token = verificationToken(email);
+
+        mvc.perform(get("/auth/verify-email").param("email", email).param("token", token)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/auth/email-verification/confirm").param("token", token)).andExpect(status().isMethodNotAllowed());
+        mvc.perform(post("/auth/login")).andExpect(status().isUnauthorized());
+        assertThat(user(email).isEnabled()).isFalse();
+
+        String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
+        for (String path : new String[] { "/user/get-info", "/user/delete", "/user/hello" })
+            mvc.perform(as(accessToken, get(path))).andExpect(status().isNotFound());
     }
 
     // ---- login ---------------------------------------------------------------------
@@ -121,8 +151,8 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
                 .andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE);
 
         // A path, not a URL (C5): with "Path=http://localhost:8080/auth" browsers never
-        // sent the cookie back to /auth/refresh.
-        assertThat(setCookie).contains("Path=/auth;").doesNotContain("http");
+        // sent the cookie back. It must be the path of the refresh endpoint (A6).
+        assertThat(setCookie).contains("Path=/api/v1/auth;").doesNotContain("http");
     }
 
     @Test
@@ -149,7 +179,7 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
 
         // Twice: the first call reads the token from MySQL, the second from the Redis cache.
         for (int i = 0; i < 2; i++) {
-            String body = mvc.perform(post("/auth/refresh").cookie(refreshCookie))
+            String body = refresh(refreshCookie)
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.accessToken").isNotEmpty())
                     .andReturn().getResponse().getContentAsString();
@@ -162,22 +192,13 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
 
     @Test
     void refreshWithAnUnknownTokenReturns401() throws Exception {
-        mvc.perform(post("/auth/refresh").cookie(new Cookie("refreshToken", "not-a-real-token")))
+        refresh(new Cookie("refreshToken", "not-a-real-token"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void refreshWithoutTheCookieReturns400() throws Exception {
-        mvc.perform(post("/auth/refresh")).andExpect(status().isBadRequest());
-    }
-
-    /** Cleanup: the leftover test endpoint is gone. */
-    @Test
-    void theHelloEndpointIsGone() throws Exception {
-        String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
-
-        mvc.perform(get("/user/hello").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/auth/refresh")).andExpect(status().isBadRequest());
     }
 
     // ---- access tokens -------------------------------------------------------------
@@ -197,7 +218,7 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
 
     @Test
     void protectedEndpointWithoutATokenReturns401() throws Exception {
-        mvc.perform(get("/user/get-info")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/users/me")).andExpect(status().isUnauthorized());
     }
 
     @Test

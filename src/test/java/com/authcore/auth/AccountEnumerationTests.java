@@ -1,14 +1,10 @@
 package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.ResultActions;
 
 import com.authcore.auth.support.IntegrationTest;
 
@@ -19,6 +15,7 @@ import jakarta.servlet.http.Cookie;
  * API's answers, and error responses never contain the submitted token.
  */
 class AccountEnumerationTests extends IntegrationTest {
+    private static final String NEW_PASSWORD = "N3w-Str0ng-Passw0rd!";
 
     // ---- login ---------------------------------------------------------------------
 
@@ -65,8 +62,8 @@ class AccountEnumerationTests extends IntegrationTest {
         assertSameAnswer(forVerified, forUnknown, 200);
         assertSameAnswer(forVerified, whileOneIsActive, 200);
         // Only the verified account actually got a code.
-        assertThat(passwordResetRepository.findByUser(user(verified))).isPresent();
-        assertThat(passwordResetRepository.findByUser(user(unverified))).isEmpty();
+        awaitEmail(verified, "Password Reset");
+        assertThat(sentEmails(unverified, "Password Reset")).isEmpty();
     }
 
     @Test
@@ -79,14 +76,14 @@ class AccountEnumerationTests extends IntegrationTest {
         String unverified = uniqueEmail();
         register(unverified, PASSWORD);
 
-        MvcResult wrongCode = confirmPasswordReset(withCode, wrongOtp(passwordResetOtp(withCode))).andReturn();
-        MvcResult noActiveCode = confirmPasswordReset(withoutCode, "123456").andReturn();
-        MvcResult forUnverified = confirmPasswordReset(unverified, "123456").andReturn();
-        MvcResult unknownEmail = confirmPasswordReset(uniqueEmail(), "123456").andReturn();
+        MvcResult wrongCode = confirmPasswordReset(withCode, wrongOtp(passwordResetOtp(withCode)), NEW_PASSWORD).andReturn();
+        MvcResult noActiveCode = confirmPasswordReset(withoutCode, "12345678", NEW_PASSWORD).andReturn();
+        MvcResult forUnverified = confirmPasswordReset(unverified, "12345678", NEW_PASSWORD).andReturn();
+        MvcResult unknownEmail = confirmPasswordReset(uniqueEmail(), "12345678", NEW_PASSWORD).andReturn();
 
-        assertSameAnswer(wrongCode, noActiveCode, 401);
-        assertSameAnswer(wrongCode, forUnverified, 401);
-        assertSameAnswer(wrongCode, unknownEmail, 401);
+        assertSameAnswer(wrongCode, noActiveCode, 400);
+        assertSameAnswer(wrongCode, forUnverified, 400);
+        assertSameAnswer(wrongCode, unknownEmail, 400);
     }
 
     // ---- email verification --------------------------------------------------------
@@ -106,35 +103,27 @@ class AccountEnumerationTests extends IntegrationTest {
         assertSameAnswer(forUnverified, forUnknown, 200);
     }
 
+    /** The link says whose it is, so nothing in the request can be used to try out emails. */
     @Test
-    void verificationLinksForUnknownOrVerifiedEmailsLookLikeInvalidLinks() throws Exception {
-        String unverified = uniqueEmail();
-        register(unverified, PASSWORD);
-        String verified = uniqueEmail();
-        registerVerifiedUserAndLogin(verified);
+    void aUsedLinkLooksLikeAnInvalidOne() throws Exception {
+        String email = uniqueEmail();
+        registerVerifiedUserAndLogin(email);
 
-        MvcResult wrongToken = verifyEmail(unverified, "some-token").andReturn();
-        MvcResult unknown = verifyEmail(uniqueEmail(), "some-token").andReturn();
-        MvcResult alreadyVerified = verifyEmail(verified, "some-token").andReturn();
-
-        assertSameAnswer(wrongToken, unknown, 401);
-        assertSameAnswer(wrongToken, alreadyVerified, 401);
+        assertSameAnswer(verifyEmail(verificationToken(email)).andReturn(), verifyEmail("some-token").andReturn(), 400);
     }
 
     // ---- no tokens in error responses ----------------------------------------------
 
     @Test
     void errorResponsesDontEchoTheSubmittedToken() throws Exception {
-        String unverified = uniqueEmail();
-        register(unverified, PASSWORD);
         String fakeRefreshToken = "fake-refresh-token-1234567890";
         String fakeLinkToken = "fake-verification-token-1234567890";
 
-        String refreshBody = mvc.perform(post("/auth/refresh").cookie(new Cookie("refreshToken", fakeRefreshToken)))
+        String refreshBody = refresh(new Cookie("refreshToken", fakeRefreshToken))
                 .andExpect(status().isUnauthorized())
                 .andReturn().getResponse().getContentAsString();
-        String verifyBody = verifyEmail(unverified, fakeLinkToken)
-                .andExpect(status().isUnauthorized())
+        String verifyBody = verifyEmail(fakeLinkToken)
+                .andExpect(status().isBadRequest())
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(refreshBody).doesNotContain(fakeRefreshToken);
@@ -154,21 +143,5 @@ class AccountEnumerationTests extends IntegrationTest {
     /** ProblemDetail includes the request path, which legitimately differs. */
     private static String withoutInstance(String body) {
         return body.replaceAll("\"instance\":\"[^\"]*\",?", "");
-    }
-
-    private ResultActions requestPasswordReset(String email) throws Exception {
-        return mvc.perform(post("/auth/reset-password").param("email", email));
-    }
-
-    private ResultActions confirmPasswordReset(String email, String otp) throws Exception {
-        return mvc.perform(post("/auth/reset-password").param("email", email)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"otp": %s, "password": "N3w-Str0ng-Passw0rd!"}
-                        """.formatted(otp)));
-    }
-
-    private ResultActions resendVerification(String email) throws Exception {
-        return mvc.perform(get("/auth/verify-email").param("email", email));
     }
 }

@@ -2,56 +2,38 @@ package com.authcore.auth.auth;
 
 import java.time.Duration;
 
-import org.jspecify.annotations.Nullable;
-import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.MsgResponse;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping(AuthController.PATH)
 @RequiredArgsConstructor
 public class AuthController {
+    // Also the path of the refresh cookie: browsers only send it to paths under this one.
+    static final String PATH = "/api/v1/auth";
+
     private static final String REFRESH_COOKIE = "refreshToken";
-    // Browsers only send the cookie to paths under this one, so it reaches
-    // /auth/refresh and nothing else. Must change if the auth endpoints move (A6).
-    private static final String REFRESH_COOKIE_PATH = "/auth";
 
     // H2: these requests get the same answer whether or not the account exists,
-    // is verified, or already has an active code, so they can't be used to find
+    // is verified, or was sent a code a moment ago, so they can't be used to find
     // out which emails are registered.
     private static final String VERIFICATION_REQUESTED = "If an account with this email exists and isn't verified yet, a verification email has been sent.";
     private static final String RESET_REQUESTED = "If an account with this email exists, a password reset email has been sent.";
 
     private final AuthService authService;
     private final AuthConfigProperties authConfigProperties;
-
-    /**
-     * Trims the "email" query parameters before they're validated: @Email rejects
-     * spaces, and the services only normalize after validation. (Emails in JSON
-     * bodies: NormalizedEmailDeserializer.)
-     */
-    @InitBinder("email")
-    void trimEmailParameters(WebDataBinder binder) {
-        binder.registerCustomEditor(String.class, new StringTrimmerEditor(false));
-    }
 
     @PostMapping("/register")
     public ResponseEntity<MsgResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -72,25 +54,28 @@ public class AuthController {
         return ResponseEntity.ok(new AuthResponse(authService.refresh(refreshToken)));
     }
 
-    @GetMapping("/verify-email")
-    public ResponseEntity<MsgResponse> verifyEmail(@RequestParam @NotBlank @Email String email,
-            @RequestParam(required = false) @Nullable String token) {
-        if (token == null) {
-            authService.resendVerification(email);
-            return message(VERIFICATION_REQUESTED);
-        }
-        authService.verifyEmail(email, token);
+    @PostMapping("/email-verification")
+    public ResponseEntity<MsgResponse> resendVerification(@Valid @RequestBody AccountEmailRequest request) {
+        authService.resendVerification(request.getEmail());
+        return message(VERIFICATION_REQUESTED);
+    }
+
+    /** A POST, so that link previews and prefetching can't use up the link (H4). */
+    @PostMapping("/email-verification/confirm")
+    public ResponseEntity<MsgResponse> verifyEmail(@Valid @RequestBody ConfirmEmailRequest request) {
+        authService.verifyEmail(request.getToken());
         return message("Email verified successfully");
     }
 
-    @PostMapping("/reset-password")
-    public ResponseEntity<MsgResponse> resetPassword(@RequestParam @NotBlank @Email String email,
-            @Valid @RequestBody(required = false) @Nullable ResetPasswordRequest request) {
-        if (request == null) {
-            authService.requestPasswordReset(email);
-            return message(RESET_REQUESTED);
-        }
-        authService.resetPassword(email, String.valueOf(request.getOtp()), request.getPassword());
+    @PostMapping("/password-reset")
+    public ResponseEntity<MsgResponse> requestPasswordReset(@Valid @RequestBody AccountEmailRequest request) {
+        authService.requestPasswordReset(request.getEmail());
+        return message(RESET_REQUESTED);
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<MsgResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.getEmail(), request.getOtp(), request.getPassword());
         return message("Password reset successfully");
     }
 
@@ -100,7 +85,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(cookie.isSecure())
                 .sameSite(cookie.getSameSite())
-                .path(REFRESH_COOKIE_PATH)
+                .path(PATH)
                 .maxAge(Duration.ofMillis(authConfigProperties.getToken().getRefreshExpiration()))
                 .build();
     }

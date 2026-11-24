@@ -2,7 +2,7 @@
 # MySQL and Redis come from Testcontainers (@ServiceConnection), so no connection
 # settings are needed here, and nothing is read from ./env.properties.
 auth:
-    base-url: http://localhost:8080
+    frontend-url: https://app.authcore.test/
     # Registers as ADMIN (AdminUserTests uses it once).
     admin-emails: first-admin@authcore.test
     token:

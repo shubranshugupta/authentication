@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import com.authcore.auth.support.IntegrationTest;
 
 /**
- * M1: browsers on an allowed frontend origin can call the API, including PUT/DELETE
+ * M1: browsers on an allowed frontend origin can call the API, including PATCH
  * and with the refresh cookie. Before, the allowed origins were never read (field name
  * mismatch) and only GET and POST were allowed.
  */
@@ -22,7 +22,7 @@ class CorsTests extends IntegrationTest {
 
     @Test
     void preflightFromTheFrontendIsAllowedWithCredentials() throws Exception {
-        preflight(FRONTEND, "/auth/login", "POST", "Content-Type")
+        preflight(FRONTEND, "/api/v1/auth/login", "POST", "Content-Type")
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, FRONTEND))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
@@ -30,25 +30,22 @@ class CorsTests extends IntegrationTest {
     }
 
     @Test
-    void putAndDeleteAreAllowedFromTheFrontend() throws Exception {
-        preflight(FRONTEND, "/user/update-info", "PUT", "Authorization, Content-Type")
+    void patchIsAllowedFromTheFrontend() throws Exception {
+        preflight(FRONTEND, "/api/v1/users/me", "PATCH", "Authorization, Content-Type")
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("PUT")));
-        preflight(FRONTEND, "/user/delete", "DELETE", "Authorization")
-                .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("DELETE")));
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("PATCH")));
     }
 
     @Test
     void viteDevServerOriginIsAllowedToo() throws Exception {
-        preflight("http://localhost:5173", "/auth/login", "POST", "Content-Type")
+        preflight("http://localhost:5173", "/api/v1/auth/login", "POST", "Content-Type")
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"));
     }
 
     @Test
     void unknownOriginIsRejected() throws Exception {
-        preflight("https://evil.example", "/auth/login", "POST", "Content-Type")
+        preflight("https://evil.example", "/api/v1/auth/login", "POST", "Content-Type")
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
@@ -57,7 +54,7 @@ class CorsTests extends IntegrationTest {
     void actualResponsesCarryTheCorsHeaders() throws Exception {
         String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
 
-        mvc.perform(get("/user/get-info")
+        mvc.perform(get("/api/v1/users/me")
                 .header(HttpHeaders.ORIGIN, FRONTEND)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())

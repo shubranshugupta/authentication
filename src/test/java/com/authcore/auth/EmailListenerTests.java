@@ -3,6 +3,7 @@ package com.authcore.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,11 +13,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.mail.MailSendException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.authcore.auth.notification.EmailRequested;
@@ -25,6 +32,7 @@ import com.authcore.auth.support.IntegrationTest;
 import jakarta.mail.internet.MimeMessage;
 
 /** A3: one event and one listener send every email. */
+@ExtendWith(OutputCaptureExtension.class)
 class EmailListenerTests extends IntegrationTest {
     private static final int EMAILS = 200;
 
@@ -106,6 +114,55 @@ class EmailListenerTests extends IntegrationTest {
         assertNotSentWithin(500, to);
     }
 
+    // ---- failures (H5) -------------------------------------------------------------
+
+    /** A short outage of the mail server used to lose the email. */
+    @Test
+    void anEmailThatCouldNotBeSentIsTriedAgain() throws Exception {
+        AtomicInteger attempts = failingMailServer(2);
+        String to = uniqueEmail();
+
+        events.publishEvent(email(to, "Password Reset", "password_reset_email", "123456"));
+
+        Awaitility.await().atMost(Duration.ofSeconds(10)).until(() -> attempts.get() == 3);
+        Thread.sleep(300);
+        assertThat(attempts).hasValue(3); // the third one succeeded
+    }
+
+    @Test
+    void itGivesUpAfterAFewTriesAndLogsWhichEmailWithoutItsToken(CapturedOutput output) throws Exception {
+        AtomicInteger attempts = failingMailServer(Integer.MAX_VALUE);
+        String to = uniqueEmail();
+
+        events.publishEvent(email(to, "Password Reset", "password_reset_email", "secret-code"));
+
+        Awaitility.await().atMost(Duration.ofSeconds(15))
+                .until(() -> output.getAll().contains("Email password_reset_email could not be sent"));
+        assertThat(attempts).hasValue(3);
+        assertThat(output.getAll()).doesNotContain("secret-code");
+    }
+
+    /** Trying again can't fix a broken template. */
+    @Test
+    void otherFailuresAreNotTriedAgain(CapturedOutput output) {
+        events.publishEvent(email(uniqueEmail(), "Password Reset", "no_such_template", "secret-code"));
+
+        Awaitility.await().atMost(Duration.ofMillis(900))
+                .until(() -> output.getAll().contains("Email no_such_template could not be sent"));
+        assertThat(output.getAll()).doesNotContain("secret-code");
+    }
+
+    /** Fails this many times, then works. Returns the number of attempts. */
+    private AtomicInteger failingMailServer(int failures) {
+        AtomicInteger attempts = new AtomicInteger();
+        Mockito.doAnswer(call -> {
+            if (attempts.incrementAndGet() <= failures)
+                throw new MailSendException("mail server down");
+            return null;
+        }).when(mailSender).send(any(MimeMessage.class));
+        return attempts;
+    }
+
     @Test
     void theEventDoesNotPrintItsToken() {
         assertThat(email("jane@example.com", "s", "t", "secret-code").toString()).doesNotContain("secret-code");
@@ -114,7 +171,7 @@ class EmailListenerTests extends IntegrationTest {
     private void assertNotSentWithin(long millis, String to) {
         try {
             Thread.sleep(millis);
-            assertThat(sentEmail(to, "Password Reset")).isNull();
+            assertThat(sentEmails(to, "Password Reset")).isEmpty();
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -122,6 +179,6 @@ class EmailListenerTests extends IntegrationTest {
 
     private static EmailRequested email(String to, String subject, String template, String token) {
         return new EmailRequested(to, subject, template,
-                Map.of("firstName", "Jane", "lastName", "Doe", "token", token, "baseUrl", "http://localhost"));
+                Map.of("firstName", "Jane", "lastName", "Doe", "token", token, "frontendUrl", "http://localhost"));
     }
 }

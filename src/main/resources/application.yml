@@ -13,6 +13,13 @@ spring:
         view:
             suffix: .html
 
+    datasource:
+        hikari:
+            # Each query sees what is committed now. With MySQL's default (REPEATABLE READ), a
+            # transaction keeps seeing what was there at its first read, even after waiting
+            # for a lock: one verification link could then be used twice at the same moment.
+            transaction-isolation: TRANSACTION_READ_COMMITTED
+
     jpa:
         hibernate:
             # Flyway owns the schema (src/main/resources/db/migration).
@@ -45,7 +52,9 @@ server:
     port: ${SERVER_PORT:8080}
 
 auth:
-    base-url: ${APP_BASE_URL:http://localhost:${server.port}}
+    # Where the web app runs. Verification emails link to its /verify-email?token=... page,
+    # which must POST the token to /api/v1/auth/email-verification/confirm.
+    frontend-url: ${FRONTEND_URL}
 
     # Comma-separated emails that get the ADMIN role (at registration, and existing
     # users at startup). The API never grants ADMIN. Empty by default.
@@ -54,7 +63,6 @@ auth:
         secret-key: ${JWT_SECRET_KEY}
         jwt-expiration: 10800000
         refresh-expiration: 604800000
-        token-expiration: 3600000
 
     # The refresh-token cookie. Keep the defaults while the frontend runs on the same
     # site as the API (e.g. localhost:3000 -> localhost:8080). For a frontend on another
