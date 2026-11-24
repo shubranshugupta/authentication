@@ -71,11 +71,11 @@ class AuthServiceTests {
     void registerSavesADisabledUserWithAHashedPasswordAndSendsTheEmail() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
         when(passwordEncoder.encode("plain")).thenReturn("hash");
-        when(userRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(userRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
         authService.register(request());
 
-        User saved = savedUser();
+        User saved = registeredUser();
         assertThat(saved.getEmail()).isEqualTo(EMAIL);
         assertThat(saved.getPassword()).isEqualTo("hash");
         assertThat(saved.getRole()).isEqualTo(Role.USER);
@@ -87,11 +87,11 @@ class AuthServiceTests {
     void registerGivesListedEmailsTheAdminRole() {
         properties.setAdminEmails(List.of("Jane@Example.com"));
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-        when(userRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(userRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
         authService.register(request());
 
-        assertThat(savedUser().getRole()).isEqualTo(Role.ADMIN);
+        assertThat(registeredUser().getRole()).isEqualTo(Role.ADMIN);
     }
 
     @Test
@@ -99,14 +99,14 @@ class AuthServiceTests {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user(true)));
 
         assertThatThrownBy(() -> authService.register(request())).isInstanceOf(UserAlreadyExistsException.class);
-        verify(userRepository, never()).save(any());
+        verify(userRepository, never()).saveAndFlush(any());
         verifyNoInteractions(tokens);
     }
 
     @Test
     void registerRejectsAnEmailTakenAtTheSameMoment() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty(), Optional.of(user(false)));
-        when(userRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(userRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate"));
 
         assertThatThrownBy(() -> authService.register(request())).isInstanceOf(UserAlreadyExistsException.class);
     }
@@ -114,7 +114,7 @@ class AuthServiceTests {
     @Test
     void registerDoesNotHideOtherDatabaseErrors() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
-        when(userRepository.save(any())).thenThrow(new DataIntegrityViolationException("other constraint"));
+        when(userRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("other constraint"));
 
         assertThatThrownBy(() -> authService.register(request())).isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -245,6 +245,12 @@ class AuthServiceTests {
     }
 
     // ---- helpers -------------------------------------------------------------------
+
+    private User registeredUser() {
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).saveAndFlush(saved.capture());
+        return saved.getValue();
+    }
 
     private User savedUser() {
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);

@@ -8,7 +8,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.common.AuthConfigProperties;
-import com.authcore.auth.common.DeadlockRetry;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.security.JwtService;
@@ -46,16 +45,28 @@ public class AuthService {
         if (userRepository.findByEmail(email).isPresent())
             throw new UserAlreadyExistsException(email + " already exists");
 
-        User saved = saveNewUser(User.builder()
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .email(email)
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(authConfigProperties.isAdminEmail(email) ? Role.ADMIN : Role.USER)
-                .enabled(false)
-                .build());
-
-        tokens.issue(saved.getId(), TokenPurpose.EMAIL_VERIFICATION);
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+        try {
+            // The account and its link together: an account without a link, if the second
+            // step failed, would only keep the email taken (H5).
+            transaction.run(() -> {
+                User saved = userRepository.saveAndFlush(User.builder()
+                        .firstName(request.getFirstName())
+                        .lastName(request.getLastName())
+                        .email(email)
+                        .password(passwordHash)
+                        .role(authConfigProperties.isAdminEmail(email) ? Role.ADMIN : Role.USER)
+                        .enabled(false)
+                        .build());
+                return tokens.issue(saved.getId(), TokenPurpose.EMAIL_VERIFICATION);
+            });
+        } catch (DataIntegrityViolationException e) {
+            // The same email was registered at the same moment, and the unique constraint
+            // rejected this one.
+            if (userRepository.findByEmail(email).isEmpty())
+                throw e;
+            throw new UserAlreadyExistsException(email + " already exists");
+        }
     }
 
     public TokenPair login(String email, String password) {
@@ -121,19 +132,5 @@ public class AuthService {
                 }).orElse(false));
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
-    }
-
-    /**
-     * Saves a new user. If the same email was registered at the same moment, the
-     * unique constraint rejects this one, and it gets the usual "already exists".
-     */
-    private User saveNewUser(User user) {
-        try {
-            return DeadlockRetry.run(() -> userRepository.save(user));
-        } catch (DataIntegrityViolationException e) {
-            if (userRepository.findByEmail(user.getEmail()).isEmpty())
-                throw e;
-            throw new UserAlreadyExistsException(user.getEmail() + " already exists");
-        }
     }
 }
