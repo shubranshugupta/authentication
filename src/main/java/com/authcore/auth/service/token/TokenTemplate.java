@@ -6,13 +6,13 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.springframework.util.StringUtils;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.authcore.auth.event.EmailRequested;
 import com.authcore.auth.utils.DeadlockRetry;
+import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.Token;
 import com.authcore.auth.exception.InvalidTokenException;
@@ -22,14 +22,13 @@ import com.authcore.auth.exception.TokenExpireException;
 public abstract class TokenTemplate<T extends Token> {
     private final JpaRepository<T, Integer> tokenRepository;
     private final ApplicationEventPublisher eventPublisher;
-    @Value("${auth.token.token-expiration}")
-    private long expireTime;
-    @Value("${auth.base-url}")
-    private String APP_URL;
+    private final AuthConfigProperties authConfigProperties;
 
-    public TokenTemplate(JpaRepository<T, Integer> tokenRepository, ApplicationEventPublisher eventPublisher) {
+    public TokenTemplate(JpaRepository<T, Integer> tokenRepository, ApplicationEventPublisher eventPublisher,
+            AuthConfigProperties authConfigProperties) {
         this.tokenRepository = tokenRepository;
         this.eventPublisher = eventPublisher;
+        this.authConfigProperties = authConfigProperties;
     }
 
     public T createToken(User user) {
@@ -43,7 +42,7 @@ public abstract class TokenTemplate<T extends Token> {
             throw new TokenAlreadyExistsException("Token already exists");
 
         // Tokens are deleted by id with a bulk query (here, in the subclasses and in
-        // RefereshTokenService): unlike delete(entity), it is harmless when another
+        // RefreshTokenService): unlike delete(entity), it is harmless when another
         // request deleted the row first. Phase 4 (A1) replaces these token tables.
         if (token != null)
             tokenRepository.deleteAllByIdInBatch(List.of(token.getId()));
@@ -51,7 +50,7 @@ public abstract class TokenTemplate<T extends Token> {
         token = createNewToken();
         token.setToken(generateRandomTokenID());
         token.setUser(user);
-        token.setExpiryDate(Instant.now().plusMillis(expireTime));
+        token.setExpiryDate(Instant.now().plusMillis(authConfigProperties.getToken().getTokenExpiration()));
         try {
             tokenRepository.save(token);
         } catch (DataIntegrityViolationException e) {
@@ -88,12 +87,12 @@ public abstract class TokenTemplate<T extends Token> {
         vars.put("firstName", StringUtils.capitalize(user.getFirstName()));
         vars.put("lastName", StringUtils.capitalize(user.getLastName()));
         vars.put("token", getEmailToken(user, newToken));
-        vars.put("baseUrl", APP_URL);
+        vars.put("baseUrl", getAppUrl());
         eventPublisher.publishEvent(new EmailRequested(user.getEmail(), getEmailSubject(), getEmailTemplate(), vars));
     }
 
     public String getAppUrl() {
-        return APP_URL;
+        return authConfigProperties.getBaseUrl();
     }
 
     /** What the email shows: the code itself, unless the subclass makes it a link. */

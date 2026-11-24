@@ -171,6 +171,15 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
         mvc.perform(post("/auth/refresh")).andExpect(status().isBadRequest());
     }
 
+    /** Cleanup: the leftover test endpoint is gone. */
+    @Test
+    void theHelloEndpointIsGone() throws Exception {
+        String accessToken = registerVerifiedUserAndLogin(uniqueEmail());
+
+        mvc.perform(get("/user/hello").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isNotFound());
+    }
+
     // ---- access tokens -------------------------------------------------------------
 
     @Test

@@ -5,6 +5,7 @@ import java.security.SecureRandom;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.impl.DeleteAccountOtp;
 import com.authcore.auth.repository.DeleteAccountRepository;
@@ -15,8 +16,9 @@ public class DeleteAccountService extends TokenTemplate<DeleteAccountOtp> {
     private final DeleteAccountRepository otpRepository;
     private final static SecureRandom random = new SecureRandom();
 
-    public DeleteAccountService(DeleteAccountRepository otpRepository, ApplicationEventPublisher eventPublisher) {
-        super(otpRepository, eventPublisher);
+    public DeleteAccountService(DeleteAccountRepository otpRepository, ApplicationEventPublisher eventPublisher,
+            AuthConfigProperties authConfigProperties) {
+        super(otpRepository, eventPublisher, authConfigProperties);
         this.otpRepository = otpRepository;
     }
 

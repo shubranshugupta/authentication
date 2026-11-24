@@ -3,7 +3,7 @@ package com.authcore.auth.service;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.exception.UserNotFoundException;
-import com.authcore.auth.dto.response.UserResposne;
+import com.authcore.auth.dto.response.UserResponse;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.repository.UserRepository;
 import com.authcore.auth.service.token.TokenType;
@@ -17,9 +17,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final TokenServiceFacade tokenService;
 
-    public UserResposne getProfile(Integer userId) {
+    public UserResponse getProfile(Integer userId) {
         User user = getUser(userId);
-        return UserResposne.builder()
+        return UserResponse.builder()
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())

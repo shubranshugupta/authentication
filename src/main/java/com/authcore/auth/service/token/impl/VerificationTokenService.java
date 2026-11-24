@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.impl.VerificationToken;
 import com.authcore.auth.repository.VerificationTokenRepository;
@@ -16,8 +17,9 @@ public class VerificationTokenService extends TokenTemplate<VerificationToken> {
     private final VerificationTokenRepository verificationTokenRepository;
 
     public VerificationTokenService(VerificationTokenRepository verificationTokenRepository,
-            ApplicationEventPublisher eventPublisher) {
-        super(verificationTokenRepository, eventPublisher);
+            ApplicationEventPublisher eventPublisher,
+            AuthConfigProperties authConfigProperties) {
+        super(verificationTokenRepository, eventPublisher, authConfigProperties);
         this.verificationTokenRepository = verificationTokenRepository;
     }
 

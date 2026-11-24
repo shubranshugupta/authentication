@@ -49,7 +49,7 @@ class AuthServiceTests {
     @Mock
     private JwtService jwtService;
     @Mock
-    private RefereshTokenService refreshTokenService;
+    private RefreshTokenService refreshTokenService;
     @Mock
     private AuthenticationManager manager;
     @Mock
@@ -79,7 +79,7 @@ class AuthServiceTests {
         assertThat(saved.getPassword()).isEqualTo("hash");
         assertThat(saved.getRole()).isEqualTo(Role.USER);
         assertThat(saved.isEnabled()).isFalse();
-        verify(tokenService).createTokenAndSendMail(saved, TokenType.VERFICATION_TOKEN);
+        verify(tokenService).createTokenAndSendMail(saved, TokenType.VERIFICATION_TOKEN);
     }
 
     @Test
@@ -125,7 +125,7 @@ class AuthServiceTests {
         User user = user(true);
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
         when(jwtService.generateToken(EMAIL)).thenReturn("access");
-        when(refreshTokenService.createRefereshToken(user))
+        when(refreshTokenService.createRefreshToken(user))
                 .thenReturn(RefreshToken.builder().refreshToken("refresh").build());
 
         assertThat(authService.login("  Jane@Example.com ", "plain")).isEqualTo(new TokenPair("access", "refresh"));
@@ -172,7 +172,7 @@ class AuthServiceTests {
         User unverified = user(false);
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(unverified));
         authService.resendVerification(EMAIL);
-        verify(tokenService).createTokenAndSendMail(unverified, TokenType.VERFICATION_TOKEN);
+        verify(tokenService).createTokenAndSendMail(unverified, TokenType.VERIFICATION_TOKEN);
     }
 
     @Test
@@ -218,7 +218,7 @@ class AuthServiceTests {
         authService.verifyEmail(EMAIL, "token");
 
         InOrder order = Mockito.inOrder(tokenService, userRepository);
-        order.verify(tokenService).verifyToken(user, "token", TokenType.VERFICATION_TOKEN);
+        order.verify(tokenService).verifyToken(user, "token", TokenType.VERIFICATION_TOKEN);
         order.verify(userRepository).save(user);
         assertThat(user.isEnabled()).isTrue();
     }
@@ -232,7 +232,7 @@ class AuthServiceTests {
         authService.resetPassword(EMAIL, "123456", "new");
 
         assertThat(savedUser().getPassword()).isEqualTo("new-hash");
-        verify(refreshTokenService).deleteRefereshToken(user);
+        verify(refreshTokenService).deleteRefreshToken(user);
     }
 
     // ---- helpers -------------------------------------------------------------------

@@ -21,7 +21,7 @@ public class TokenServiceFacade {
 
     private Token createToken(User user, TokenType tokenType) {
         switch (tokenType) {
-            case VERFICATION_TOKEN:
+            case VERIFICATION_TOKEN:
                 return verificationTokenService.createToken(user);
             case RESET_PASSWORD_TOKEN:
                 return passwordResetService.createToken(user);
@@ -34,7 +34,7 @@ public class TokenServiceFacade {
 
     private void sendMail(User user, Token newToken, TokenType tokenType) {
         switch (tokenType) {
-            case VERFICATION_TOKEN:
+            case VERIFICATION_TOKEN:
                 verificationTokenService.publishEmailEvent(user, (VerificationToken) newToken);
                 break;
             case RESET_PASSWORD_TOKEN:
@@ -50,7 +50,7 @@ public class TokenServiceFacade {
 
     public boolean createTokenAndSendMail(User user, TokenType tokenType) {
         switch (tokenType) {
-            case VERFICATION_TOKEN:
+            case VERIFICATION_TOKEN:
             case RESET_PASSWORD_TOKEN:
             case DELETE_ACCOUNT_TOKEN:
                 Token newToken = createToken(user, tokenType);
@@ -63,7 +63,7 @@ public class TokenServiceFacade {
 
     public boolean verifyToken(User user, String token, TokenType tokenType) {
         switch (tokenType) {
-            case VERFICATION_TOKEN:
+            case VERIFICATION_TOKEN:
                 return verificationTokenService.verifyToken(user, token);
             case RESET_PASSWORD_TOKEN:
                 return passwordResetService.verifyToken(user, token);

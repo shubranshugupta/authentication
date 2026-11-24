@@ -4,9 +4,9 @@ import java.util.Date;
 
 import javax.crypto.SecretKey;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.exception.InvalidTokenException;
 import com.authcore.auth.exception.TokenExpireException;
 
@@ -22,11 +22,14 @@ import io.jsonwebtoken.security.Keys;
 public class JwtService {
     public static final String INVALID_TOKEN = "The access token is invalid.";
 
-    @Value("${auth.token.secret-key}")
-    private String SECRET_KEY;
+    private final SecretKey signingKey;
+    private final long expireTime;
 
-    @Value("${auth.token.jwt-expiration}")
-    private long expireTime;
+    public JwtService(AuthConfigProperties authConfigProperties) {
+        AuthConfigProperties.TokenConfigProperties token = authConfigProperties.getToken();
+        this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(token.getSecretKey()));
+        this.expireTime = token.getJwtExpiration();
+    }
 
     public String generateToken(String email) {
         long now = System.currentTimeMillis();
@@ -34,7 +37,7 @@ public class JwtService {
                 .subject(email)
                 .issuedAt(new Date(now))
                 .expiration(new Date(now + expireTime))
-                .signWith(getSigningKey(), Jwts.SIG.HS256)
+                .signWith(signingKey, Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -48,7 +51,7 @@ public class JwtService {
         Claims claims;
         try {
             claims = Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(signingKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
@@ -61,9 +64,5 @@ public class JwtService {
         if (claims.getSubject() == null || claims.getExpiration() == null)
             throw new InvalidTokenException(INVALID_TOKEN);
         return claims.getSubject();
-    }
-
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET_KEY));
     }
 }

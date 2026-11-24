@@ -33,7 +33,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RefereshTokenService refereshTokenService;
+    private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager manager;
     private final TokenServiceFacade tokenService;
     private final AuthConfigProperties authConfigProperties;
@@ -52,7 +52,7 @@ public class AuthService {
                 .enabled(false)
                 .build());
 
-        tokenService.createTokenAndSendMail(saved, TokenType.VERFICATION_TOKEN);
+        tokenService.createTokenAndSendMail(saved, TokenType.VERIFICATION_TOKEN);
     }
 
     public TokenPair login(String email, String password) {
@@ -68,19 +68,19 @@ public class AuthService {
 
         return new TokenPair(
                 jwtService.generateToken(user.getEmail()),
-                refereshTokenService.createRefereshToken(user).getRefreshToken());
+                refreshTokenService.createRefreshToken(user).getRefreshToken());
     }
 
     /** Returns a new access token. */
     public String refresh(String refreshToken) {
-        return jwtService.generateToken(refereshTokenService.verifyRefereshToken(refreshToken).getEmail());
+        return jwtService.generateToken(refreshTokenService.verifyRefreshToken(refreshToken).getEmail());
     }
 
     /** Sends the verification email again, if there is an account that needs it. */
     public void resendVerification(String email) {
         userRepository.findByEmail(EmailAddresses.normalize(email))
                 .filter(user -> !user.isEnabled())
-                .ifPresent(user -> sendTokenUnlessOneIsActive(user, TokenType.VERFICATION_TOKEN));
+                .ifPresent(user -> sendTokenUnlessOneIsActive(user, TokenType.VERIFICATION_TOKEN));
     }
 
     public void verifyEmail(String email, String token) {
@@ -88,7 +88,7 @@ public class AuthService {
                 .filter(found -> !found.isEnabled())
                 .orElseThrow(() -> new InvalidTokenException(INVALID_VERIFICATION_LINK));
 
-        verifyToken(user, token, TokenType.VERFICATION_TOKEN, INVALID_VERIFICATION_LINK);
+        verifyToken(user, token, TokenType.VERIFICATION_TOKEN, INVALID_VERIFICATION_LINK);
 
         user.setEnabled(true);
         userRepository.save(user);
@@ -112,7 +112,7 @@ public class AuthService {
         userRepository.save(user);
         // Whoever knew the old password may hold the refresh token. (The copy in the
         // Redis cache goes in Phase 5, C2.)
-        refereshTokenService.deleteRefereshToken(user);
+        refreshTokenService.deleteRefreshToken(user);
     }
 
     /**

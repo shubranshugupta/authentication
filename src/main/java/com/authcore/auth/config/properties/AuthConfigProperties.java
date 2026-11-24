@@ -9,12 +9,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.io.DecodingException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @Validated
@@ -28,8 +32,10 @@ public class AuthConfigProperties {
      * startup. The only way to create an admin; the API never grants the role.
      */
     private List<String> adminEmails = new ArrayList<>();
+    @Valid
     private TokenConfigProperties token = new TokenConfigProperties();
     private CorsConfigProperties cors = new CorsConfigProperties();
+
     /** Whether this email is listed in auth.admin-emails (case-insensitive). */
     public boolean isAdminEmail(String email) {
         return email != null && adminEmails.stream()
@@ -41,13 +47,35 @@ public class AuthConfigProperties {
     @Valid
     private CookieConfigProperties cookie = new CookieConfigProperties();
 
+    /**
+     * Expirations are in milliseconds. Validated at startup: an unset JWT_SECRET_KEY is
+     * bound as the literal text "${JWT_SECRET_KEY}" and would only fail at the first login.
+     */
     @Data
     @NoArgsConstructor
     public static class TokenConfigProperties {
+        private static final int MIN_SECRET_KEY_BYTES = 32;
+
+        @ToString.Exclude
         private String secretKey;
+        @Positive
         private long jwtExpiration;
+        @Positive
         private long refreshExpiration;
+        @Positive
         private long tokenExpiration;
+
+        // A check on a boolean, not on the field: the startup error prints the rejected
+        // value, and that must not be the key.
+        @AssertTrue(message = "auth.token.secret-key (JWT_SECRET_KEY) must be a base64 key of at least "
+                + MIN_SECRET_KEY_BYTES + " bytes")
+        public boolean isSecretKeyValid() {
+            try {
+                return secretKey != null && Decoders.BASE64.decode(secretKey).length >= MIN_SECRET_KEY_BYTES;
+            } catch (DecodingException e) {
+                return false;
+            }
+        }
     }
 
     @Data

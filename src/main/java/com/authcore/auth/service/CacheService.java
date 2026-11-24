@@ -3,10 +3,10 @@ package com.authcore.auth.service;
 import java.io.Serializable;
 import java.time.Duration;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -34,7 +34,7 @@ public class CacheService<K extends Serializable, V extends Serializable> {
 
     // The serializer stores plain JSON without type information, so a read returns
     // a Map; convert it into the requested type.
-    public V getValue(K key, @NonNull Class<V> type) {
+    public @Nullable V getValue(K key, Class<V> type) {
         Object value = valueOperations.get(key);
         return value == null ? null : jsonMapper.convertValue(value, type);
     }

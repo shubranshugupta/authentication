@@ -25,13 +25,4 @@ public class VerificationToken extends Token {
     public void setToken(String token) {
         this.verifyToken = token;
     }
-
-    @Override
-    public boolean equals(Token obj) {
-        if (obj instanceof VerificationToken) {
-            return this.verifyToken.equals(obj.getToken()) && this.getId().equals(obj.getId());
-        }
-
-        return false;
-    }
 }

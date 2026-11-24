@@ -25,13 +25,4 @@ public class DeleteAccountOtp extends Token {
     public void setToken(String token) {
         this.otp = Long.parseLong(token);
     }
-
-    @Override
-    public boolean equals(Token obj) {
-        if (obj instanceof DeleteAccountOtp) {
-            return this.otp == Long.parseLong(obj.getToken()) && this.getId().equals(obj.getId());
-        }
-
-        return false;
-    }
 }

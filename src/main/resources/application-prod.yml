@@ -2,8 +2,8 @@
 # No files are imported and there are no defaults for hosts or credentials:
 # set every variable below in the environment (or a secret manager).
 #
-# Note: only JWT_SECRET_KEY (read with @Value) and MAIL_FROM (validated as an email address)
-# stop startup when missing. A missing DB_*, REDIS_* or MAIL_HOST/USERNAME/PASSWORD variable
+# Note: only JWT_SECRET_KEY (must be a base64 key) and MAIL_FROM (must be an email address)
+# stop startup when missing (AuthConfigProperties validates them). A missing DB_*, REDIS_* or MAIL_HOST/USERNAME/PASSWORD variable
 # is passed on as the literal text "${NAME}" and only fails on first use. A startup check for
 # this is planned (IMPROVEMENTS.md, M3, Phase 6).
 spring:

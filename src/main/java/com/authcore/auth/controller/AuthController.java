@@ -1,12 +1,12 @@
 package com.authcore.auth.controller;
 
+import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.Nullable;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -80,7 +80,7 @@ public class AuthController {
 
     @GetMapping("/verify-email")
     public ResponseEntity<MsgResponse> verifyEmail(@RequestParam @NotBlank @Email String email,
-            @Nullable @RequestParam String token) {
+            @RequestParam(required = false) @Nullable String token) {
         if (token == null) {
             authService.resendVerification(email);
             return message(VERIFICATION_REQUESTED);
@@ -91,7 +91,7 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<MsgResponse> resetPassword(@RequestParam @NotBlank @Email String email,
-            @Nullable @Valid @RequestBody ResetPasswordRequest request) {
+            @Valid @RequestBody(required = false) @Nullable ResetPasswordRequest request) {
         if (request == null) {
             authService.requestPasswordReset(email);
             return message(RESET_REQUESTED);

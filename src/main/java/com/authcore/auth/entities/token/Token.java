@@ -20,7 +20,6 @@ import jakarta.persistence.OneToOne;
 
 @Getter
 @Setter
-// @Entity
 @NoArgsConstructor
 @AllArgsConstructor
 @MappedSuperclass
@@ -42,6 +41,4 @@ public abstract class Token {
     public abstract String getToken();
 
     public abstract void setToken(String token);
-
-    public abstract boolean equals(Token obj);
 }

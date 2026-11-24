@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.entities.token.impl.PasswordResetOtp;
 import com.authcore.auth.repository.PasswordResetRepository;
@@ -16,8 +17,9 @@ public class PasswordResetService extends TokenTemplate<PasswordResetOtp> {
     private final PasswordResetRepository otpRepository;
     private final static SecureRandom random = new SecureRandom();
 
-    public PasswordResetService(PasswordResetRepository otpRepository, ApplicationEventPublisher eventPublisher) {
-        super(otpRepository, eventPublisher);
+    public PasswordResetService(PasswordResetRepository otpRepository, ApplicationEventPublisher eventPublisher,
+            AuthConfigProperties authConfigProperties) {
+        super(otpRepository, eventPublisher, authConfigProperties);
         this.otpRepository = otpRepository;
     }
 
