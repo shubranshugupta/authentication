@@ -45,6 +45,12 @@ auth:
         refresh-expiration: 604800000
         token-expiration: 3600000
 
+    # The sender of every email. MAIL_FROM must be an address your mail provider
+    # accepts as a sender (for Amazon SES: a verified address or domain).
+    mail:
+        from: ${MAIL_FROM}
+        from-name: AuthCore
+
     cors:
         allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:${server.port}}
         allowed-methods:

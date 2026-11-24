@@ -57,7 +57,7 @@ docker compose --env-file env.properties up -d
 
 MySQL is published on port `3307` (not 3306), so it doesn't clash with a MySQL server already installed locally. All services listen on `127.0.0.1` only.
 
-[Mailpit](https://mailpit.axllent.org) is a fake mail server: in development, every email the app sends (verification links, OTPs) lands in its inbox at **http://localhost:8025** instead of a real mailbox. To send real emails from development instead, set `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME` and `MAIL_PASSWORD` (for Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your account password).
+[Mailpit](https://mailpit.axllent.org) is a fake mail server: in development, every email the app sends (verification links, OTPs) lands in its inbox at **http://localhost:8025** instead of a real mailbox. To send real emails from development instead, set `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` and `MAIL_FROM` (for Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your account password).
 
 #### Run the Application
 
@@ -72,7 +72,7 @@ NOTE: The application will start at `http://localhost:8080`.
 | Profile | How it's selected | Settings come from |
 |---|---|---|
 | `dev` | the default | environment variables, then `./env.properties`, then defaults matching `docker-compose.yml`. SQL logging is on. |
-| `prod` | `SPRING_PROFILES_ACTIVE=prod` | environment variables only. There are no defaults for hosts or credentials: set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` and `APP_BASE_URL`. |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod` | environment variables only. There are no defaults for hosts or credentials: set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `APP_BASE_URL`. |
 
 ### Database Migrations
 

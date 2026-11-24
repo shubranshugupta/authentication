@@ -26,3 +26,7 @@ spring:
 
     jpa:
         show-sql: true
+
+auth:
+    mail:
+        from: ${MAIL_FROM:noreply@authcore.local}

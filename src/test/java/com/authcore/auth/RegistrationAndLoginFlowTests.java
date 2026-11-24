@@ -24,6 +24,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.Cookie;
 
@@ -52,6 +53,11 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
                 .contains(verificationToken(email))
                 .contains("cid:authcoreLogo")
                 .contains("AuthCore");
+
+        // The sender comes from auth.mail.from / from-name, not from the SMTP login.
+        InternetAddress from = (InternetAddress) verificationEmail.getFrom()[0];
+        assertThat(from.getAddress()).isEqualTo("noreply@authcore.test");
+        assertThat(from.getPersonal()).isEqualTo("AuthCore");
     }
 
     @Test
