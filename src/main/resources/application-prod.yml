@@ -25,6 +25,17 @@ spring:
         port: ${MAIL_PORT:587}
         username: ${MAIL_USERNAME}
         password: ${MAIL_PASSWORD}
+        properties:
+            mail:
+                smtp:
+                    # Refuse to send unencrypted: fail instead of falling back to plain text.
+                    starttls:
+                        required: true
+                    # JavaMail waits forever by default; a slow mail server would hang the
+                    # email threads and let queued emails pile up. Values in milliseconds.
+                    connectiontimeout: 5000
+                    timeout: 5000
+                    writetimeout: 5000
 
     jpa:
         show-sql: false
