@@ -15,7 +15,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.authcore.auth.support.IntegrationTest;
 
@@ -26,9 +28,13 @@ import jakarta.servlet.http.Cookie;
  * They all used to insert the same row, and all but one got 500.
  */
 class ConcurrentRequestTests extends IntegrationTest {
+    @Autowired
+    private JdbcTemplate jdbc;
+
     private static final int REQUESTS = 8;
     /** Whether the requests really overlap is up to the scheduler, so try a few times. */
     private static final int ROUNDS = 3;
+    private static final int DEADLOCK_ROUNDS = 25;
 
     @Test
     void firstLoginsAllSucceedAndShareOneRefreshToken() throws Exception {
@@ -78,10 +84,13 @@ class ConcurrentRequestTests extends IntegrationTest {
         }
     }
 
-    /** H2, the same leak in the other email endpoint. */
+    /**
+     * H2, the same leak in the other email endpoint. Inserting the row that was just
+     * deleted can also deadlock in MySQL, which needs more rounds to show up.
+     */
     @Test
     void verificationResendsAllGetTheUsualAnswer() throws Exception {
-        for (int round = 0; round < ROUNDS; round++) {
+        for (int round = 0; round < DEADLOCK_ROUNDS; round++) {
             String email = uniqueEmail();
             register(email, PASSWORD);
             verificationTokenRepository.deleteAllByIdInBatch(
@@ -90,6 +99,19 @@ class ConcurrentRequestTests extends IntegrationTest {
             assertThat(allAtOnce(() -> mvc.perform(get("/auth/verify-email").param("email", email))
                     .andReturn().getResponse().getStatus())).containsOnly(200);
             assertThat(verificationToken(email)).isNotEmpty();
+        }
+    }
+
+    /** The same for a login whose old refresh token has expired: it's deleted and replaced. */
+    @Test
+    void loginsThatReplaceAnExpiredRefreshTokenAllSucceed() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String email = uniqueEmail();
+            registerVerifiedUserAndLogin(email);
+            jdbc.update("update refresh_tokens set expiry_date = '2020-01-01' where user_id = ?", user(email).getId());
+
+            assertThat(allAtOnce(() -> login(email, PASSWORD).andReturn().getResponse().getStatus()))
+                    .containsOnly(200);
         }
     }
 

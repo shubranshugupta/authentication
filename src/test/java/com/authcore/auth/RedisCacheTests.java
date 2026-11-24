@@ -11,10 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 
-import com.authcore.auth.entities.RefreshToken;
-import com.authcore.auth.entities.Role;
-import com.authcore.auth.entities.User;
-import com.authcore.auth.service.CacheService;
+import com.authcore.auth.common.CacheService;
+import com.authcore.auth.session.CachedRefreshToken;
 import com.authcore.auth.support.IntegrationTest;
 
 /**
@@ -23,74 +21,35 @@ import com.authcore.auth.support.IntegrationTest;
  * uses Spring Boot's spring.data.redis settings instead of a hard-coded localhost:6379.
  */
 class RedisCacheTests extends IntegrationTest {
+    private static final CachedRefreshToken TOKEN = new CachedRefreshToken(7, 42,
+            Instant.parse("2030-01-01T00:00:00Z"));
 
     @Autowired
-    private CacheService<String, User> userCache;
-
-    @Autowired
-    private CacheService<String, RefreshToken> refreshTokenCache;
+    private CacheService<String, CachedRefreshToken> cache;
 
     @Autowired
     @Qualifier("redisTemplate")
     private RedisTemplate<String, Serializable> redisTemplate;
 
     @Test
-    void aCachedUserReadsBackWithEveryField() {
-        String key = "test-user-" + UUID.randomUUID();
-        User user = sampleUser();
-
-        userCache.save(key, user, 60_000L);
-        User cached = userCache.getValue(key, User.class);
-
-        assertThat(cached.getId()).isEqualTo(user.getId());
-        assertThat(cached.getEmail()).isEqualTo(user.getEmail());
-        assertThat(cached.getFirstName()).isEqualTo("jane");
-        assertThat(cached.getRole()).isEqualTo(Role.USER);
-        assertThat(cached.isEnabled()).isTrue();
-    }
-
-    @Test
-    void aCachedRefreshTokenReadsBackWithItsUser() {
+    void aCachedRefreshTokenReadsBackWithEveryField() {
         String key = "test-refresh-token-" + UUID.randomUUID();
-        RefreshToken token = RefreshToken.builder()
-                .id(7)
-                .refreshToken(UUID.randomUUID().toString())
-                .expiryDate(Instant.parse("2030-01-01T00:00:00Z"))
-                .user(sampleUser())
-                .build();
 
-        refreshTokenCache.save(key, token, 60_000L);
-        RefreshToken cached = refreshTokenCache.getValue(key, RefreshToken.class);
+        cache.save(key, TOKEN, 60_000L);
 
-        assertThat(cached.getRefreshToken()).isEqualTo(token.getRefreshToken());
-        assertThat(cached.getExpiryDate()).isEqualTo(token.getExpiryDate());
-        assertThat(cached.getUser().getEmail()).isEqualTo(token.getUser().getEmail());
-        assertThat(cached.getUser().isEnabled()).isTrue();
+        assertThat(cache.getValue(key, CachedRefreshToken.class)).isEqualTo(TOKEN);
     }
 
     @Test
     void entriesSavedWithAnExpiryGetATtlAndCanBeDeleted() {
         String key = "test-ttl-" + UUID.randomUUID();
 
-        userCache.save(key, sampleUser(), 60_000L);
+        cache.save(key, TOKEN, 60_000L);
         assertThat(redisTemplate.getExpire(key)).isBetween(1L, 60L);
-        assertThat(userCache.contains(key)).isTrue();
+        assertThat(cache.contains(key)).isTrue();
 
-        userCache.delete(key);
-        assertThat(userCache.contains(key)).isFalse();
-        assertThat(userCache.getValue(key, User.class)).isNull();
-    }
-
-    private static User sampleUser() {
-        User user = User.builder()
-                .id(42)
-                .firstName("jane")
-                .lastName("doe")
-                .email(uniqueEmail())
-                .password("$2a$10$hash")
-                .role(Role.USER)
-                .build();
-        user.setEnabled(true);
-        return user;
+        cache.delete(key);
+        assertThat(cache.contains(key)).isFalse();
+        assertThat(cache.getValue(key, CachedRefreshToken.class)).isNull();
     }
 }

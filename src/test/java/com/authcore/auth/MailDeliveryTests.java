@@ -31,9 +31,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import com.authcore.auth.repository.UserRepository;
-import com.authcore.auth.repository.VerificationTokenRepository;
 import com.authcore.auth.support.TestcontainersConfiguration;
+import com.authcore.auth.token.VerificationTokenRepository;
+import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 
 /**

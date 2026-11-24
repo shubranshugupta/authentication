@@ -14,9 +14,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.test.web.servlet.ResultActions;
 
-import com.authcore.auth.config.AdminBootstrap;
-import com.authcore.auth.entities.Role;
+import com.authcore.auth.security.UserPrincipal;
 import com.authcore.auth.support.IntegrationTest;
+import com.authcore.auth.user.AdminBootstrap;
+import com.authcore.auth.user.Role;
 
 /** H7: role names Spring can check, and the read-only admin API. */
 class AdminUserTests extends IntegrationTest {
@@ -33,7 +34,7 @@ class AdminUserTests extends IntegrationTest {
         register(email, PASSWORD);
 
         assertThat(user(email).getRole()).isEqualTo(Role.USER);
-        assertThat(user(email).getAuthorities()).extracting(GrantedAuthority::getAuthority)
+        assertThat(UserPrincipal.from(user(email)).getAuthorities()).extracting(GrantedAuthority::getAuthority)
                 .containsExactly("ROLE_USER");
     }
 

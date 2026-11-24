@@ -23,11 +23,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-import com.authcore.auth.entities.User;
-import com.authcore.auth.repository.DeleteAccountRepository;
-import com.authcore.auth.repository.PasswordResetRepository;
-import com.authcore.auth.repository.UserRepository;
-import com.authcore.auth.repository.VerificationTokenRepository;
+import com.authcore.auth.token.DeleteAccountRepository;
+import com.authcore.auth.token.PasswordResetRepository;
+import com.authcore.auth.token.VerificationTokenRepository;
+import com.authcore.auth.user.User;
+import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 
 import jakarta.mail.Message;
@@ -165,18 +165,26 @@ public abstract class IntegrationTest {
     protected MimeMessage awaitEmail(String to, String subject) throws Exception {
         long deadline = System.currentTimeMillis() + EMAIL_WAIT_MILLIS;
         while (System.currentTimeMillis() < deadline) {
-            for (Invocation invocation : Mockito.mockingDetails(mailSender).getInvocations()) {
-                if (invocation.getMethod().getName().equals("send")
-                        && invocation.getArguments().length == 1
-                        && invocation.getArguments()[0] instanceof MimeMessage message
-                        && to.equals(recipient(message))
-                        && subject.equals(message.getSubject())) {
-                    return message;
-                }
-            }
+            MimeMessage message = sentEmail(to, subject);
+            if (message != null)
+                return message;
             Thread.sleep(50);
         }
         return fail("No email with subject '" + subject + "' was sent to " + to);
+    }
+
+    /** The email with this subject sent to this address so far, or null. */
+    protected MimeMessage sentEmail(String to, String subject) throws Exception {
+        for (Invocation invocation : Mockito.mockingDetails(mailSender).getInvocations()) {
+            if (invocation.getMethod().getName().equals("send")
+                    && invocation.getArguments().length == 1
+                    && invocation.getArguments()[0] instanceof MimeMessage message
+                    && to.equals(recipient(message))
+                    && subject.equals(message.getSubject())) {
+                return message;
+            }
+        }
+        return null;
     }
 
     protected static String htmlBody(MimeMessage message) throws Exception {
