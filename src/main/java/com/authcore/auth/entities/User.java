@@ -29,10 +29,14 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
-@Data
+@Getter
+@Setter
+@ToString
 @Entity
 @Builder
 @NoArgsConstructor
@@ -55,6 +59,7 @@ public class User implements UserDetails {
     @Email(message = "Email should be valid")
     private String email;
 
+    @ToString.Exclude
     @Column(name = "password", nullable = false)
     @Size(min = 8, message = "Password should be at least 8 characters long")
     private String password;
@@ -78,18 +83,22 @@ public class User implements UserDetails {
     @Column(name = "is_enabled", nullable = false)
     private boolean enabled;
 
+    @ToString.Exclude
     @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private RefreshToken refreshToken;
 
+    @ToString.Exclude
     @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private VerificationToken verificationToken;
 
+    @ToString.Exclude
     @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private PasswordResetOtp passwordResetOtp;
 
+    @ToString.Exclude
     @JsonIgnore
     @OneToOne(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private DeleteAccountOtp deleteAccountOtp;
@@ -127,5 +136,23 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    // JPA entities compare by database id only. Lombok's @Data compared every field,
+    // and User <-> RefreshToken point at each other, so equals/hashCode/toString
+    // recursed until StackOverflowError. getId() (not the field) works on Hibernate
+    // proxies; the constant hashCode stays stable when a new entity gets its id.
+    @Override
+    public boolean equals(Object other) {
+        if (this == other)
+            return true;
+        if (!(other instanceof User that))
+            return false;
+        return getId() != null && getId().equals(that.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 }

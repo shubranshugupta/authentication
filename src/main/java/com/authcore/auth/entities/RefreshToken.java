@@ -14,10 +14,14 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
-@Data
+@Getter
+@Setter
+@ToString
 @Entity
 @Builder
 @NoArgsConstructor
@@ -28,6 +32,7 @@ public class RefreshToken implements Serializable {
     @GeneratedValue
     private Integer id;
 
+    @ToString.Exclude
     @Column(name = "token", nullable = false, length = 1000)
     private String refreshToken;
 
@@ -38,6 +43,25 @@ public class RefreshToken implements Serializable {
     @Column(name = "expiry_date", nullable = false)
     private Instant expiryDate;
 
+    @ToString.Exclude
     @OneToOne
     private User user;
+
+    // JPA entities compare by database id only. Lombok's @Data compared every field,
+    // and User <-> RefreshToken point at each other, so equals/hashCode/toString
+    // recursed until StackOverflowError. getId() (not the field) works on Hibernate
+    // proxies; the constant hashCode stays stable when a new entity gets its id.
+    @Override
+    public boolean equals(Object other) {
+        if (this == other)
+            return true;
+        if (!(other instanceof RefreshToken that))
+            return false;
+        return getId() != null && getId().equals(that.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }
