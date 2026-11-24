@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.authcore.auth.dto.EmailDTO;
@@ -45,7 +46,16 @@ public abstract class TokenTemplate<T extends Token> {
         token.setToken(generateRandomTokenID());
         token.setUser(user);
         token.setExpiryDate(Instant.now().plusMillis(expireTime));
-        tokenRepository.save(token);
+        try {
+            tokenRepository.save(token);
+        } catch (DataIntegrityViolationException e) {
+            // Another request created this user's token at the same moment (one token
+            // per user is allowed). Answer as if it had already been there: a 500 would
+            // show that the account exists (H2).
+            if (getTokenFromUser(user) == null)
+                throw e;
+            throw new TokenAlreadyExistsException("Token already exists");
+        }
 
         return token;
     }

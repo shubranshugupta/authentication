@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.entities.RefreshToken;
@@ -36,8 +37,12 @@ public class RefereshTokenService {
 
         refereshToken = RefreshToken.builder().refreshToken(UUID.randomUUID().toString())
                 .expiryDate(Instant.now().plusMillis(expireTime)).user(user).build();
-        refereshToken = refereshTokenRepository.save(refereshToken);
-        return refereshToken;
+        try {
+            return refereshTokenRepository.save(refereshToken);
+        } catch (DataIntegrityViolationException e) {
+            // Another login of this user created the token at the same moment: share it.
+            return refereshTokenRepository.findByUser(user).orElseThrow(() -> e);
+        }
     }
 
     public RefreshToken verifyRefereshToken(String token) {

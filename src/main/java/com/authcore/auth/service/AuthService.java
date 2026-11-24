@@ -2,6 +2,7 @@ package com.authcore.auth.service;
 
 import java.time.Duration;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.lang.Nullable;
@@ -68,7 +69,7 @@ public class AuthService {
                                 .enabled(false)
                                 .build();
 
-                User saved = userService.saveUser(user);
+                User saved = saveNewUser(user);
                 tokenService.createTokenAndSendMail(saved, TokenType.VERFICATION_TOKEN);
 
                 return MsgResponse.builder()
@@ -163,6 +164,20 @@ public class AuthService {
                 return MsgResponse.builder()
                                 .msg("Password reset successfully")
                                 .build();
+        }
+
+        /**
+         * Saves a new user. If the same email was registered at the same moment, the
+         * unique constraint rejects this one, and it gets the usual "already exists".
+         */
+        private User saveNewUser(User user) {
+                try {
+                        return userService.saveUser(user);
+                } catch (DataIntegrityViolationException e) {
+                        if (userService.getUserByEmail(user.getEmail()) == null)
+                                throw e;
+                        throw new UserAlreadyExistsException(user.getEmail() + " already exists");
+                }
         }
 
         /**
