@@ -24,6 +24,13 @@ spring:
         # Hibernate 7 failed when saving them (e.g. email verification returned 500).
         open-in-view: false
 
+    data:
+        redis:
+            # Fail after 2 seconds when Redis doesn't answer. The default is a full minute,
+            # and every request that uses the cache would hang that long.
+            connect-timeout: 2s
+            timeout: 2s
+
     # The mail server (host, port, login) is set per profile: dev sends to Mailpit,
     # prod needs MAIL_HOST, MAIL_PORT, MAIL_USERNAME and MAIL_PASSWORD.
     mail:
