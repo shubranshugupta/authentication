@@ -22,7 +22,6 @@ import com.authcore.auth.entities.User;
 import com.authcore.auth.exception.InvalidTokenException;
 import com.authcore.auth.exception.TokenAlreadyExistsException;
 import com.authcore.auth.exception.UserAlreadyExistsException;
-import com.authcore.auth.entities.RefreshToken;
 import com.authcore.auth.service.token.TokenType;
 import com.authcore.auth.validation.EmailAddresses;
 
@@ -108,8 +107,7 @@ public class AuthService {
         }
 
         public AuthResponse verifyRefreshToken(String refreshToken) {
-                RefreshToken refToken = refereshTokenService.verifyRefereshToken(refreshToken);
-                User user = refToken.getUser();
+                User user = refereshTokenService.verifyRefereshToken(refreshToken);
 
                 String accessToken = jwtService.generateToken(user.getEmail());
                 return AuthResponse.builder()

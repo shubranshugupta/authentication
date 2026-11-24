@@ -1,6 +1,5 @@
 package com.authcore.auth.entities;
 
-import java.io.Serializable;
 import java.sql.Date;
 
 import org.hibernate.annotations.CreationTimestamp;
@@ -29,7 +28,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "users")
-public class User implements Serializable {
+public class User {
     @Id
     @GeneratedValue
     @Column(name = "id", updatable = false, nullable = false)
@@ -61,10 +60,6 @@ public class User implements Serializable {
     @Column(name = "role", nullable = false)
     private Role role;
 
-    // Named "enabled", not "isEnabled": Jackson 3 builds a cached User through the
-    // all-args constructor, matching parameter names to JSON properties. The getter
-    // isEnabled() writes the property as "enabled", so a parameter named "isEnabled"
-    // was never matched and reading a cached user failed.
     @Column(name = "is_enabled", nullable = false)
     private boolean enabled;
 

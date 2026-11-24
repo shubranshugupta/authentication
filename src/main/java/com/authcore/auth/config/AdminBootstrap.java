@@ -10,7 +10,6 @@ import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.entities.Role;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.repository.UserRepository;
-import com.authcore.auth.service.UserService;
 import com.authcore.auth.validation.EmailAddresses;
 
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 public class AdminBootstrap {
     private final AuthConfigProperties authConfigProperties;
     private final UserRepository userRepository;
-    private final UserService userService;
 
     @EventListener(ApplicationReadyEvent.class)
     public void promoteConfiguredAdmins() {
@@ -47,7 +45,7 @@ public class AdminBootstrap {
         if (user.getRole() == Role.ADMIN)
             return;
         user.setRole(Role.ADMIN);
-        userService.saveUser(user); // also evicts the cached copy
+        userRepository.save(user);
         log.info("Gave the ADMIN role to user {} (listed in auth.admin-emails)", user.getId());
     }
 }

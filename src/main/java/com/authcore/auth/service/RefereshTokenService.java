@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.repository.UserRepository;
 import com.authcore.auth.entities.RefreshToken;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.exception.InvalidTokenException;
@@ -20,7 +21,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RefereshTokenService {
     private final RefereshTokenRepository refereshTokenRepository;
-    private final CacheService<String, RefreshToken> cacheService;
+    private final UserRepository userRepository;
+    private final CacheService<String, CachedRefreshToken> cacheService;
 
     @Value("${auth.token.refresh-expiration}")
     private long expireTime;
@@ -50,42 +52,41 @@ public class RefereshTokenService {
                 .ifPresent(token -> refereshTokenRepository.deleteAllByIdInBatch(List.of(token.getId())));
     }
 
-    public RefreshToken verifyRefereshToken(String token) {
-        RefreshToken refereshToken = getRefereshTokenFromToken(token);
+    /** Returns the user this refresh token belongs to. */
+    public User verifyRefereshToken(String token) {
+        // Never echo the token: error responses and logs must not contain it (H2).
+        CachedRefreshToken refereshToken = getRefereshTokenFromToken(token);
         if (refereshToken == null) {
-            // Never echo the token: error responses and logs must not contain it (H2).
             throw new InvalidTokenException("Invalid refresh token");
         }
-
-        if (refereshToken.getExpiryDate().isBefore(Instant.now())) {
-            refereshTokenRepository.deleteAllByIdInBatch(List.of(refereshToken.getId()));
+        if (refereshToken.expiryDate().isBefore(Instant.now())) {
+            refereshTokenRepository.deleteAllByIdInBatch(List.of(refereshToken.tokenId()));
             throw new TokenExpireException("Refresh token has expired");
         }
-
-        return refereshToken;
+        // Always from the database: a cached token can outlive its user's account.
+        return userRepository.findById(refereshToken.userId())
+                .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
     }
 
-    private RefreshToken getRefereshTokenFromToken(String token) {
+    private CachedRefreshToken getRefereshTokenFromToken(String token) {
         String cacheTokenKey = buildCacheKey(token);
-        if (cacheService.contains(cacheTokenKey)) {
-            return cacheService.getValue(cacheTokenKey, RefreshToken.class);
+        CachedRefreshToken cached = cacheService.getValue(cacheTokenKey, CachedRefreshToken.class);
+        if (cached != null) {
+            return cached;
         }
 
-        RefreshToken refereshToken = refereshTokenRepository.findByRefreshToken(token).orElse(null);
+        CachedRefreshToken refereshToken = refereshTokenRepository.findByRefreshToken(token)
+                .map(found -> new CachedRefreshToken(found.getId(), found.getUser().getId(), found.getExpiryDate()))
+                .orElse(null);
         if (refereshToken != null) {
             cacheService.save(cacheTokenKey, refereshToken, expireTime);
         }
         return refereshToken;
     }
 
-    // private void deleteRefreshTokenFromCache(String token) {
-    // String cacheTokenKey = buildCacheKey(token);
-    // if (cacheService.contains(cacheTokenKey)) {
-    // cacheService.delete(cacheTokenKey);
-    // }
-    // }
-
-    public String buildCacheKey(String email) {
-        return "refreshToken-" + email;
+    // Not "refreshToken-", the prefix used while entries held the whole user: those
+    // entries must not be read back.
+    private String buildCacheKey(String token) {
+        return "refresh-token:" + token;
     }
 }

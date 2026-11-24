@@ -19,7 +19,6 @@ public class UserService {
         private final UserRepository userRepository;
         private final JwtService jwtService;
         private final TokenServiceFacade tokenService;
-        private final CacheService<String, User> cacheService;
 
         public UserResposne getUserInfo(String token) {
                 String email = jwtService.getEmailFromToken(token);
@@ -65,9 +64,6 @@ public class UserService {
 
                 tokenService.verifyToken(user, String.valueOf(request.getOtp()), TokenType.DELETE_ACCOUNT_TOKEN);
 
-                String cacheKey = buildCacheKey(email);
-                if (cacheService.contains(cacheKey))
-                        cacheService.delete(cacheKey);
                 userRepository.delete(user);
 
                 return MsgResponse.builder()
@@ -76,26 +72,10 @@ public class UserService {
         }
 
         public User getUserByEmail(String email) {
-                String cacheKey = buildCacheKey(email);
-                if (cacheService.contains(cacheKey))
-                        return cacheService.getValue(cacheKey, User.class);
-
-                User user = userRepository.findByEmail(email).orElse(null);
-                if (user != null)
-                        cacheService.save(cacheKey, user, null);
-
-                return user;
+                return userRepository.findByEmail(email).orElse(null);
         }
 
         public User saveUser(User user) {
-                String cacheKey = buildCacheKey(user.getEmail());
-                if (cacheService.contains(cacheKey))
-                        cacheService.delete(cacheKey);
-
                 return userRepository.save(user);
-        }
-
-        public String buildCacheKey(String email) {
-                return "user-" + email;
         }
 }

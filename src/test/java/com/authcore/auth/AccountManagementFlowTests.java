@@ -161,6 +161,21 @@ class AccountManagementFlowTests extends IntegrationTest {
     }
 
     @Test
+    void theTokensOfADeletedAccountStopWorking() throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        Cookie refreshCookie = refreshCookie(email, PASSWORD);
+        // Puts the refresh token in the Redis cache, where it used to outlive the account.
+        refresh(refreshCookie).andExpect(status().isOk());
+
+        requestAccountDeletion(accessToken).andExpect(status().isOk());
+        confirmAccountDeletion(accessToken, deleteAccountOtp(email)).andExpect(status().isOk());
+
+        getProfile(accessToken).andExpect(status().isUnauthorized());
+        refresh(refreshCookie).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void accountDeletionWithAWrongOtpReturns401AndKeepsTheUser() throws Exception {
         String email = uniqueEmail();
         String accessToken = registerVerifiedUserAndLogin(email);

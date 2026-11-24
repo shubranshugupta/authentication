@@ -1,6 +1,5 @@
 package com.authcore.auth.entities;
 
-import java.io.Serializable;
 import java.sql.Date;
 import java.time.Instant;
 
@@ -27,7 +26,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "refresh_tokens")
-public class RefreshToken implements Serializable {
+public class RefreshToken {
     @Id
     @GeneratedValue
     private Integer id;
