@@ -47,9 +47,7 @@ public class RefreshToken implements Serializable {
     @OneToOne
     private User user;
 
-    // JPA entities compare by database id only. Lombok's @Data compared every field,
-    // and User <-> RefreshToken point at each other, so equals/hashCode/toString
-    // recursed until StackOverflowError. getId() (not the field) works on Hibernate
+    // JPA entities compare by database id only. getId() (not the field) works on Hibernate
     // proxies; the constant hashCode stays stable when a new entity gets its id.
     @Override
     public boolean equals(Object other) {

@@ -1,5 +1,6 @@
 package com.authcore.auth.config;
 
+import org.springframework.security.core.userdetails.User;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -10,7 +11,6 @@ import org.springframework.security.authentication.AccountStatusUserDetailsCheck
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,20 +26,13 @@ public class ApplicationConfig {
     private final UserRepository userRepository;
 
     @Bean
-    UserDetailsService userDetailsService() {
-        return username -> userRepository.findByEmail(username)
-                .map(user -> (UserDetails) user)
-                .orElseThrow(() -> new UsernameNotFoundException(username + " user not found"));
-    }
-
-    @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
     AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService());
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(this::loginDetails);
         // Check "disabled" (email not verified) only after the password matched. By
         // default Spring checks it first, so any password revealed that an unverified
         // account exists (H2). Unknown emails already fail like wrong passwords.
@@ -49,6 +42,20 @@ public class ApplicationConfig {
         provider.setPasswordEncoder(passwordEncoder());
 
         return provider;
+    }
+
+    /**
+     * What the password check needs, for that check only. Not a UserDetailsService bean:
+     * after login, requests are authenticated by JwtAuthFilter (with a UserPrincipal).
+     */
+    private UserDetails loginDetails(String email) {
+        return userRepository.findByEmail(email)
+                .map(user -> User.withUsername(user.getEmail())
+                        .password(user.getPassword())
+                        .roles(user.getRole().name())
+                        .disabled(!user.isEnabled())
+                        .build())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
     @Bean

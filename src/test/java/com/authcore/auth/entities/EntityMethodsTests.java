@@ -7,18 +7,18 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 /**
- * C6: User and RefreshToken point at each other. With Lombok's @Data, toString(),
- * equals() and hashCode() followed that link forever (StackOverflowError), and
- * toString() printed the password hash and the refresh token.
+ * C6: with Lombok's @Data, toString() printed the password hash and the refresh token,
+ * and equals() compared every field. (User and RefreshToken also pointed at each other,
+ * which recursed until StackOverflowError; since A4 only the token points at the user.)
  */
 class EntityMethodsTests {
     private static final String PASSWORD_HASH = "$2a$10$secret-bcrypt-hash";
     private static final String TOKEN_VALUE = "secret-refresh-token-value";
 
     @Test
-    void linkedUserAndRefreshTokenCanBePrintedAndHashed() {
-        User user = linkedUser(1);
-        RefreshToken token = user.getRefreshToken();
+    void userAndRefreshTokenCanBePrintedAndHashed() {
+        User user = user(1);
+        RefreshToken token = refreshToken(1, user);
 
         assertThat(user.toString()).contains("jane@example.com");
         assertThat(token.toString()).contains("RefreshToken");
@@ -28,20 +28,20 @@ class EntityMethodsTests {
 
     @Test
     void toStringLeavesOutSecrets() {
-        User user = linkedUser(1);
+        User user = user(1);
 
-        assertThat(user.toString()).doesNotContain(PASSWORD_HASH).doesNotContain(TOKEN_VALUE);
-        assertThat(user.getRefreshToken().toString()).doesNotContain(TOKEN_VALUE).doesNotContain(PASSWORD_HASH);
+        assertThat(user.toString()).doesNotContain(PASSWORD_HASH);
+        assertThat(refreshToken(1, user).toString()).doesNotContain(TOKEN_VALUE).doesNotContain(PASSWORD_HASH);
     }
 
     @Test
     void entitiesAreEqualWhenTheyHaveTheSameDatabaseId() {
-        User user = linkedUser(1);
-        User sameRowLoadedAgain = linkedUser(1);
+        User user = user(1);
+        User sameRowLoadedAgain = user(1);
         sameRowLoadedAgain.setFirstName("changed");
 
         assertThat(user).isEqualTo(sameRowLoadedAgain).hasSameHashCodeAs(sameRowLoadedAgain);
-        assertThat(user).isNotEqualTo(linkedUser(2));
+        assertThat(user).isNotEqualTo(user(2));
     }
 
     @Test
@@ -52,21 +52,22 @@ class EntityMethodsTests {
         assertThat(unsaved).isEqualTo(unsaved).isNotEqualTo(otherUnsaved);
     }
 
-    private static User linkedUser(int id) {
-        User user = User.builder()
+    private static User user(int id) {
+        return User.builder()
                 .id(id)
                 .firstName("jane")
                 .email("jane@example.com")
                 .password(PASSWORD_HASH)
                 .role(Role.USER)
                 .build();
-        RefreshToken token = RefreshToken.builder()
+    }
+
+    private static RefreshToken refreshToken(int id, User user) {
+        return RefreshToken.builder()
                 .id(id)
                 .refreshToken(TOKEN_VALUE)
                 .expiryDate(Instant.parse("2030-01-01T00:00:00Z"))
                 .user(user)
                 .build();
-        user.setRefreshToken(token);
-        return user;
     }
 }

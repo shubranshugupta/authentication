@@ -35,10 +35,9 @@ public abstract class TokenTemplate<T extends Token> {
         if (token != null && token.getExpiryDate().isAfter(Instant.now()))
             throw new TokenAlreadyExistsException("Token already exists");
 
-        // Tokens are deleted by id with a bulk query (here and in the subclasses and
-        // RefereshTokenService). Hibernate 7 rejects delete(entity) for them: loading
-        // the token also loads its User, whose inverse @OneToOne would still point at
-        // the deleted token. Phase 4 (A1) replaces these token tables.
+        // Tokens are deleted by id with a bulk query (here, in the subclasses and in
+        // RefereshTokenService): unlike delete(entity), it is harmless when another
+        // request deleted the row first. Phase 4 (A1) replaces these token tables.
         if (token != null)
             tokenRepository.deleteAllByIdInBatch(List.of(token.getId()));
 

@@ -45,6 +45,11 @@ public class RefereshTokenService {
         }
     }
 
+    public void deleteRefereshToken(User user) {
+        refereshTokenRepository.findByUser(user)
+                .ifPresent(token -> refereshTokenRepository.deleteAllByIdInBatch(List.of(token.getId())));
+    }
+
     public RefreshToken verifyRefereshToken(String token) {
         RefreshToken refereshToken = getRefereshTokenFromToken(token);
         if (refereshToken == null) {

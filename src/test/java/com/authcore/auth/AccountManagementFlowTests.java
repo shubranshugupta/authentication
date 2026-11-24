@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.authcore.auth.support.IntegrationTest;
 
+import jakarta.servlet.http.Cookie;
+
 /** Profile update, password reset, and account deletion. */
 class AccountManagementFlowTests extends IntegrationTest {
     private static final String NEW_PASSWORD = "N3w-Str0ng-Passw0rd!";
@@ -42,6 +44,24 @@ class AccountManagementFlowTests extends IntegrationTest {
         assertThat(user(email).getFirstName()).isEqualTo("janet");
     }
 
+    /** The cached user used to be saved without its links, which deleted its refresh token. */
+    @Test
+    void updatingTheProfileKeepsTheUserLoggedIn() throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        Cookie refreshCookie = refreshCookie(email, PASSWORD);
+
+        mvc.perform(put("/user/update-info")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"firstName": "janet", "lastName": "smith"}
+                        """))
+                .andExpect(status().isOk());
+
+        refresh(refreshCookie).andExpect(status().isOk());
+    }
+
     // ---- password reset ------------------------------------------------------------
 
     @Test
@@ -62,6 +82,19 @@ class AccountManagementFlowTests extends IntegrationTest {
         login(email, NEW_PASSWORD).andExpect(status().isOk());
         login(email, PASSWORD).andExpect(status().isUnauthorized());
         assertThat(passwordResetRepository.findByUser(user(email))).isEmpty();
+    }
+
+    /** Whoever knew the old password may hold a refresh token, so a reset ends the session. */
+    @Test
+    void passwordResetEndsTheSession() throws Exception {
+        String email = uniqueEmail();
+        registerVerifiedUserAndLogin(email);
+        Cookie refreshCookie = refreshCookie(email, PASSWORD);
+
+        requestPasswordReset(email).andExpect(status().isOk());
+        confirmPasswordReset(email, passwordResetOtp(email), NEW_PASSWORD).andExpect(status().isOk());
+
+        refresh(refreshCookie).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -140,6 +173,10 @@ class AccountManagementFlowTests extends IntegrationTest {
     }
 
     // ---- helpers -------------------------------------------------------------------
+
+    private ResultActions refresh(Cookie refreshCookie) throws Exception {
+        return mvc.perform(post("/auth/refresh").cookie(refreshCookie));
+    }
 
     private ResultActions requestPasswordReset(String email) throws Exception {
         return mvc.perform(post("/auth/reset-password").param("email", email));

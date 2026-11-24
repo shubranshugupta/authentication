@@ -6,13 +6,14 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
+import com.authcore.auth.security.UserPrincipal;
+import com.authcore.auth.repository.UserRepository;
+import com.authcore.auth.exception.InvalidTokenException;
 import com.authcore.auth.service.JwtService;
 
 import jakarta.servlet.FilterChain;
@@ -25,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
+    private final UserRepository userRepository;
     private final HandlerExceptionResolver handlerExceptionResolver;
 
     @Override
@@ -47,12 +48,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
             if (email != null && auth == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                if (jwtService.isTokenValid(token, userDetails)) {
+                UserPrincipal principal = userRepository.findByEmail(email)
+                        .map(UserPrincipal::from)
+                        .orElseThrow(() -> new InvalidTokenException("The access token is invalid."));
+                if (jwtService.isTokenValid(token, principal.email())) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
+                            principal,
                             null,
-                            userDetails.getAuthorities());
+                            principal.getAuthorities());
 
                     authToken.setDetails(
                             new WebAuthenticationDetailsSource().buildDetails(request));

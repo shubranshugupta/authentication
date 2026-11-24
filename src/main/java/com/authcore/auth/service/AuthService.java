@@ -88,7 +88,7 @@ public class AuthService {
                                                 request.getPassword()));
                 User user = userService.getUserByEmail(email);
 
-                String accessToken = jwtService.generateToken(user);
+                String accessToken = jwtService.generateToken(user.getEmail());
                 String refreshToken = refereshTokenService.createRefereshToken(user)
                                 .getRefreshToken();
 
@@ -111,7 +111,7 @@ public class AuthService {
                 RefreshToken refToken = refereshTokenService.verifyRefereshToken(refreshToken);
                 User user = refToken.getUser();
 
-                String accessToken = jwtService.generateToken(user);
+                String accessToken = jwtService.generateToken(user.getEmail());
                 return AuthResponse.builder()
                                 .accessToken(accessToken)
                                 .build();
@@ -161,6 +161,9 @@ public class AuthService {
                 verifyToken(user, String.valueOf(request.getOtp()), TokenType.RESET_PASSWORD_TOKEN, INVALID_OTP);
                 user.setPassword(passwordEncoder.encode(request.getPassword()));
                 userService.saveUser(user);
+                // Whoever knew the old password may hold the refresh token. (The copy in the
+                // Redis cache goes in Phase 5, C2.)
+                refereshTokenService.deleteRefereshToken(user);
                 return MsgResponse.builder()
                                 .msg("Password reset successfully")
                                 .build();
