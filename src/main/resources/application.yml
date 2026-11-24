@@ -39,6 +39,10 @@ server:
 
 auth:
     base-url: ${APP_BASE_URL:http://localhost:${server.port}}
+
+    # Comma-separated emails that get the ADMIN role (at registration, and existing
+    # users at startup). The API never grants ADMIN. Empty by default.
+    admin-emails: ${AUTH_ADMIN_EMAILS:}
     token:
         secret-key: ${JWT_SECRET_KEY}
         jwt-expiration: 10800000

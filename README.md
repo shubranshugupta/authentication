@@ -104,6 +104,24 @@ The integration tests start real MySQL and Redis containers with [Testcontainers
 - **Emails** are trimmed and lowercased, so `Jane@Example.com` and `jane@example.com` are the same account.
 - **Invalid input** returns `400` with an `errors` object that maps each field to its problem, for example `{"password": "must be at least 12 characters"}`.
 
+### Admin Endpoints
+
+These need an access token of a user with the `ADMIN` role (otherwise `403`; without a token, `401`).
+
+1. List users: `GET /api/v1/admin/users?page=0&size=20` (zero-based pages, at most 100 per page)
+2. Get one user: `GET /api/v1/admin/users/{id}`
+
+The responses never include password hashes or tokens.
+
+#### Making someone an admin
+
+The API never grants the `ADMIN` role. List the admins' emails in the `AUTH_ADMIN_EMAILS` setting (comma-separated):
+
+- a listed email registers as `ADMIN`;
+- existing users with a listed email are promoted when the application starts.
+
+Removing an email from the list doesn't demote anyone.
+
 ## Error Handling
 
 The system is designed to handle and log errors efficiently. Custom exceptions are used to manage different types of errors, and meaningful messages are returned to the client.

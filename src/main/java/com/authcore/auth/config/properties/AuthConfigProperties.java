@@ -1,6 +1,8 @@
 package com.authcore.auth.config.properties;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -20,8 +22,20 @@ import lombok.NoArgsConstructor;
 @ConfigurationProperties("auth")
 public class AuthConfigProperties {
     private String baseUrl;
+
+    /**
+     * Emails that get the ADMIN role: at registration, and for existing users at
+     * startup. The only way to create an admin; the API never grants the role.
+     */
+    private List<String> adminEmails = new ArrayList<>();
     private TokenConfigProperties token = new TokenConfigProperties();
     private CorsConfigProperties cors = new CorsConfigProperties();
+    /** Whether this email is listed in auth.admin-emails (case-insensitive). */
+    public boolean isAdminEmail(String email) {
+        return email != null && adminEmails.stream()
+                .anyMatch(admin -> admin.trim().toLowerCase(Locale.ROOT).equals(email.trim().toLowerCase(Locale.ROOT)));
+    }
+
     @Valid
     private MailConfigProperties mail = new MailConfigProperties();
     @Valid

@@ -55,7 +55,7 @@ public class AuthService {
                                 .lastName(request.getLastName())
                                 .email(email)
                                 .password(passwordEncoder.encode(request.getPassword()))
-                                .role(Role.USER)
+                                .role(authConfigProperties.isAdminEmail(email) ? Role.ADMIN : Role.USER)
                                 .enabled(false)
                                 .build();
 
