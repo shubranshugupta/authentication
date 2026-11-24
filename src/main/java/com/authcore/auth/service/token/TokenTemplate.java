@@ -54,12 +54,13 @@ public abstract class TokenTemplate<T extends Token> {
         T origToken = getTokenFromUser(user);
 
         if (origToken == null || !origToken.getToken().equals(token)) {
-            throw new InvalidTokenException(token + " token is invalid");
+            // Never echo the token: error responses and logs must not contain it (H2).
+            throw new InvalidTokenException("The code or link is invalid or has expired.");
         }
 
         if (origToken.getExpiryDate().isBefore(Instant.now())) {
             tokenRepository.deleteAllByIdInBatch(List.of(origToken.getId()));
-            throw new TokenExpireException(token + " Token is expired");
+            throw new TokenExpireException("The code or link is invalid or has expired.");
         }
 
         deleteToken(origToken);

@@ -74,7 +74,8 @@ public class UserExceptionHandler implements AuthExceptionHandler {
         if (nextHandler == null && error == null) {
             error = ProblemDetail.forStatusAndDetail(
                     HttpStatusCode.valueOf(500),
-                    e.getMessage());
+                    "An unexpected error occurred.");
+            // The details stay in the server log only (H2).
             error.setProperty("msg", "An unexpected error occurred");
             log.error(e.getMessage(), e);
         }

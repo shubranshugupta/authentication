@@ -43,14 +43,13 @@ public class RefereshTokenService {
     public RefreshToken verifyRefereshToken(String token) {
         RefreshToken refereshToken = getRefereshTokenFromToken(token);
         if (refereshToken == null) {
-            throw new InvalidTokenException(token + " is invalid refresh token.",
-                    new Throwable("Invalid refresh token"));
+            // Never echo the token: error responses and logs must not contain it (H2).
+            throw new InvalidTokenException("Invalid refresh token");
         }
 
         if (refereshToken.getExpiryDate().isBefore(Instant.now())) {
             refereshTokenRepository.deleteAllByIdInBatch(List.of(refereshToken.getId()));
-            throw new TokenExpireException(token + " Refresh token is expired",
-                    new Throwable("Refresh token is expired"));
+            throw new TokenExpireException("Refresh token has expired");
         }
 
         return refereshToken;

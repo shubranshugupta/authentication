@@ -6,6 +6,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -39,6 +40,12 @@ public class ApplicationConfig {
     @Bean
     AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService());
+        // Check "disabled" (email not verified) only after the password matched. By
+        // default Spring checks it first, so any password revealed that an unverified
+        // account exists (H2). Unknown emails already fail like wrong passwords.
+        provider.setPreAuthenticationChecks(user -> {
+        });
+        provider.setPostAuthenticationChecks(new AccountStatusUserDetailsChecker());
         provider.setPasswordEncoder(passwordEncoder());
 
         return provider;
