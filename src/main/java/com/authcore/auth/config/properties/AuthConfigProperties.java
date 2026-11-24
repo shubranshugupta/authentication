@@ -39,7 +39,7 @@ public class AuthConfigProperties {
     @Data
     @NoArgsConstructor
     public static class CorsConfigProperties {
-        private List<String> allowedOrigin;
+        private List<String> allowedOrigins;
         private List<String> allowedMethods;
         private List<String> allowedHeaders;
     }
