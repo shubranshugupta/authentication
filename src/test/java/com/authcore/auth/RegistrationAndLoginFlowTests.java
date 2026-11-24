@@ -212,15 +212,26 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    /**
-     * Current behaviour, recorded on purpose: still 500 (A2/M6 change this to 401 in
-     * Phase 3). Since H2 the response no longer includes the internal error message.
-     */
+    /** M6: these used to be 500. */
     @Test
-    void malformedTokenReturns500WithoutInternalDetails() throws Exception {
-        mvc.perform(get("/user/get-info").header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.detail").value("An unexpected error occurred."));
+    void tokensThatAreNotJwtsReturn401() throws Exception {
+        for (String notAJwt : new String[] { "not-a-jwt", "", "a.b.c", "eyJhbGciOiJub25lIn0.eyJzdWIiOiJhIn0.", "%%%" }) {
+            getProfile(notAJwt)
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("INVALID_TOKEN"))
+                    .andExpect(jsonPath("$.detail").value("The access token is invalid."));
+        }
+    }
+
+    /** The server always sets an expiry; a token without one must not live forever. */
+    @Test
+    void tokenWithoutAnExpiryReturns401() throws Exception {
+        String email = uniqueEmail();
+        registerVerifiedUserAndLogin(email);
+        SecretKey serverKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+
+        getProfile(Jwts.builder().subject(email).signWith(serverKey, Jwts.SIG.HS256).compact())
+                .andExpect(status().isUnauthorized());
     }
 
     private static String token(String email, SecretKey key, Instant expiresAt) {

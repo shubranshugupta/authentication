@@ -1,76 +1,69 @@
 package com.authcore.auth.service;
 
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
 
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.exception.InvalidTokenException;
+import com.authcore.auth.exception.TokenExpireException;
+
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 
+/** Creates and checks the access tokens. */
 @Service
 public class JwtService {
+    public static final String INVALID_TOKEN = "The access token is invalid.";
+
     @Value("${auth.token.secret-key}")
     private String SECRET_KEY;
 
     @Value("${auth.token.jwt-expiration}")
     private long expireTime;
 
-    private Claims extractAllClaims(String token) {
-        return Jwts
-                .parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-    }
-
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
-
-    public String extractEmail(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
-    }
-
-    public String generateToken(
-            Map<String, Object> extraClaims,
-            String email) {
+    public String generateToken(String email) {
+        long now = System.currentTimeMillis();
         return Jwts.builder()
-                .claims(extraClaims)
                 .subject(email)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expireTime))
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + expireTime))
                 .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
-    public String generateToken(String email) {
-        return generateToken(new HashMap<>(), email);
-    }
-
-    public Boolean isTokenValid(String token, String email) {
-        return (extractEmail(token).equals(email) && !isTokenExpired(token));
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+    /**
+     * Returns the email a valid token was issued to.
+     *
+     * @throws TokenExpireException  if the token was valid once
+     * @throws InvalidTokenException if it was never valid: wrong signature, or not a JWT
+     */
+    public String extractEmail(String token) {
+        Claims claims;
+        try {
+            claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (ExpiredJwtException e) {
+            throw new TokenExpireException("The access token has expired.", e);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new InvalidTokenException(INVALID_TOKEN, e);
+        }
+        // The parser accepts a token without an expiry; this server never issues one.
+        if (claims.getSubject() == null || claims.getExpiration() == null)
+            throw new InvalidTokenException(INVALID_TOKEN);
+        return claims.getSubject();
     }
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET_KEY));
     }
 }

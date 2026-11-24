@@ -1,6 +1,5 @@
 package com.authcore.auth.config;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -28,7 +27,6 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
     private final AuthConfigProperties authConfigProperties;
-    @Qualifier("delegatedAuthenticationEntryPoint")
     private final DelegatedAuthenticationEntryPoint authEntryPoint;
 
     @Bean

@@ -3,9 +3,9 @@ package com.authcore.auth.service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.exception.UserNotFoundException;
 import com.authcore.auth.dto.response.AdminUserPageResponse;
 import com.authcore.auth.dto.response.AdminUserResponse;
 import com.authcore.auth.entities.User;
@@ -39,6 +39,6 @@ public class AdminUserService {
     public AdminUserResponse getUser(int id) {
         return userRepository.findById(id)
                 .map(AdminUserResponse::from)
-                .orElseThrow(() -> new UsernameNotFoundException("User " + id + " not found"));
+                .orElseThrow(() -> new UserNotFoundException(id));
     }
 }

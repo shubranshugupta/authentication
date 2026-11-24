@@ -1,8 +1,8 @@
 package com.authcore.auth.service;
 
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.exception.UserNotFoundException;
 import com.authcore.auth.dto.response.UserResposne;
 import com.authcore.auth.entities.User;
 import com.authcore.auth.repository.UserRepository;
@@ -45,6 +45,6 @@ public class UserService {
 
     private User getUser(Integer userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new UsernameNotFoundException("User " + userId + " not found"));
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 }
