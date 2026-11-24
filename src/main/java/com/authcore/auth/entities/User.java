@@ -26,7 +26,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -61,7 +60,6 @@ public class User implements UserDetails {
 
     @ToString.Exclude
     @Column(name = "password", nullable = false)
-    @Size(min = 8, message = "Password should be at least 8 characters long")
     private String password;
 
     @CreationTimestamp

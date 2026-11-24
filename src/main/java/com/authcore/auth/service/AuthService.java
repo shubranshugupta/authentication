@@ -22,6 +22,7 @@ import com.authcore.auth.entities.User;
 import com.authcore.auth.exception.UserAlreadyExistsException;
 import com.authcore.auth.entities.RefreshToken;
 import com.authcore.auth.service.token.TokenType;
+import com.authcore.auth.validation.EmailAddresses;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -44,14 +45,15 @@ public class AuthService {
         private static final String REFRESH_COOKIE_PATH = "/auth";
 
         public MsgResponse registerUser(RegisterRequest request) {
-                User user = userService.getUserByEmail(request.getEmail());
+                String email = EmailAddresses.normalize(request.getEmail());
+                User user = userService.getUserByEmail(email);
                 if (user != null)
-                        throw new UserAlreadyExistsException(request.getEmail() + " already exists");
+                        throw new UserAlreadyExistsException(email + " already exists");
 
                 user = User.builder()
                                 .firstName(request.getFirstName())
                                 .lastName(request.getLastName())
-                                .email(request.getEmail())
+                                .email(email)
                                 .password(passwordEncoder.encode(request.getPassword()))
                                 .role(Role.USER)
                                 .enabled(false)
@@ -63,13 +65,14 @@ public class AuthService {
         }
 
         public AuthResponse loginUser(LoginRequest request, HttpServletResponse response) {
-                User user = userService.getUserByEmail(request.getEmail());
+                String email = EmailAddresses.normalize(request.getEmail());
+                User user = userService.getUserByEmail(email);
                 if (user == null)
-                        throw new UsernameNotFoundException(request.getEmail() + " user not found");
+                        throw new UsernameNotFoundException(email + " user not found");
 
                 manager.authenticate(
                                 new UsernamePasswordAuthenticationToken(
-                                                request.getEmail(),
+                                                email,
                                                 request.getPassword()));
 
                 String accessToken = jwtService.generateToken(user);
@@ -102,6 +105,7 @@ public class AuthService {
         }
 
         public MsgResponse verifyEmail(String email, String token) {
+                email = EmailAddresses.normalize(email);
                 User user = userService.getUserByEmail(email);
 
                 if (user == null)
@@ -131,6 +135,7 @@ public class AuthService {
         }
 
         public MsgResponse resetPassword(String email, @Nullable ResetPasswordRequest request) {
+                email = EmailAddresses.normalize(email);
                 User user = userService.getUserByEmail(email);
                 if (user == null)
                         throw new UsernameNotFoundException(email + " user not found");

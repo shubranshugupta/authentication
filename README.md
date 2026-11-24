@@ -76,7 +76,7 @@ NOTE: The application will start at `http://localhost:8080`.
 
 ### Database Migrations
 
-The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V2__...sql`, `V3__...sql`, ...). Never edit a migration that has already run.
+The schema is managed by [Flyway](https://documentation.red-gate.com/flyway). Migrations live in `src/main/resources/db/migration` and run automatically at startup. Hibernate only validates the schema (`ddl-auto: validate`), so every schema change must be a new migration file (`V3__...sql`, `V4__...sql`, ...). Never edit a migration that has already run.
 
 ### Running the Tests
 
@@ -97,6 +97,12 @@ The integration tests start real MySQL and Redis containers with [Testcontainers
 7. Update User Profile: `PUT /user/update-info`
 8. Delete User: `DELETE /user/delete`
 9. Hello World: `GET /user/hello`
+
+### Input Rules
+
+- **Passwords** (registration and reset): at least 12 characters and at most 72 bytes. bcrypt ignores anything after 72 bytes; accented letters and emoji take 2–4 bytes each.
+- **Emails** are trimmed and lowercased, so `Jane@Example.com` and `jane@example.com` are the same account.
+- **Invalid input** returns `400` with an `errors` object that maps each field to its problem, for example `{"password": "must be at least 12 characters"}`.
 
 ## Error Handling
 

@@ -1,0 +1,12 @@
+-- V2: lowercase the emails stored before the app started normalizing them (H1).
+--
+-- Every lookup now uses the lowercase email. A row with capitals is still found (MySQL
+-- compares emails case-insensitively), but its Redis cache key is built from two
+-- different spellings, so the cached user goes stale.
+--
+-- Two rows can't end up with the same email: uk_users_email is already case-insensitive.
+-- Spaces need no cleanup: the User entity's @Email never allowed them to be saved.
+--
+-- Access tokens issued to an affected user contain the old spelling and stop working;
+-- they have to log in again.
+update users set email = lower(email);
