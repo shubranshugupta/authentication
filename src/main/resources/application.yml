@@ -45,6 +45,14 @@ auth:
         refresh-expiration: 604800000
         token-expiration: 3600000
 
+    # The refresh-token cookie. Keep the defaults while the frontend runs on the same
+    # site as the API (e.g. localhost:3000 -> localhost:8080). For a frontend on another
+    # domain, set AUTH_COOKIE_SAME_SITE=None (needs AUTH_COOKIE_SECURE=true and HTTPS).
+    # Browsers accept Secure cookies from http://localhost, so secure stays on in dev.
+    cookie:
+        secure: ${AUTH_COOKIE_SECURE:true}
+        same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
+
     # The sender of every email. MAIL_FROM must be an address your mail provider
     # accepts as a sender (for Amazon SES: a verified address or domain).
     mail:

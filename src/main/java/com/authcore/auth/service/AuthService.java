@@ -1,6 +1,9 @@
 package com.authcore.auth.service;
 
-import org.springframework.beans.factory.annotation.Value;
+import java.time.Duration;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -8,6 +11,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.config.properties.AuthConfigProperties;
 import com.authcore.auth.dto.response.AuthResponse;
 import com.authcore.auth.dto.response.MsgResponse;
 import com.authcore.auth.dto.request.LoginRequest;
@@ -19,7 +23,6 @@ import com.authcore.auth.exception.UserAlreadyExistsException;
 import com.authcore.auth.entities.RefreshToken;
 import com.authcore.auth.service.token.TokenType;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
@@ -32,12 +35,13 @@ public class AuthService {
         private final RefereshTokenService refereshTokenService;
         private final AuthenticationManager manager;
         private final TokenServiceFacade tokenService;
+        private final AuthConfigProperties authConfigProperties;
 
-        @Value("${auth.base-url}")
-        private String APP_URL;
+        public static final String REFRESH_COOKIE = "refreshToken";
 
-        @Value("${auth.token.refresh-expiration}")
-        private long REFRESH_EXPIRATION;
+        // Browsers only send the cookie to paths under this one, so it reaches
+        // /auth/refresh and nothing else. Must change if the auth endpoints move.
+        private static final String REFRESH_COOKIE_PATH = "/auth";
 
         public MsgResponse registerUser(RegisterRequest request) {
                 User user = userService.getUserByEmail(request.getEmail());
@@ -72,16 +76,16 @@ public class AuthService {
                 String refreshToken = refereshTokenService.createRefereshToken(user)
                                 .getRefreshToken();
 
-                Cookie cookie = new Cookie("refreshToken", refreshToken);
-                cookie.setPath(APP_URL + "/auth");
-                cookie.setHttpOnly(true);
-                cookie.setMaxAge((int) REFRESH_EXPIRATION / 1000);
+                AuthConfigProperties.CookieConfigProperties cookieConfig = authConfigProperties.getCookie();
+                ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, refreshToken)
+                                .httpOnly(true)
+                                .secure(cookieConfig.isSecure())
+                                .sameSite(cookieConfig.getSameSite())
+                                .path(REFRESH_COOKIE_PATH)
+                                .maxAge(Duration.ofMillis(authConfigProperties.getToken().getRefreshExpiration()))
+                                .build();
 
-                if (APP_URL.startsWith("https://")) {
-                        cookie.setSecure(true);
-                }
-
-                response.addCookie(cookie);
+                response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
                 return AuthResponse.builder()
                                 .accessToken(accessToken)
                                 .build();

@@ -106,15 +106,23 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
     // ---- login ---------------------------------------------------------------------
 
     @Test
-    void loginReturnsAnAccessTokenAndAnHttpOnlyRefreshCookie() throws Exception {
+    void loginReturnsAnAccessTokenAndARefreshCookieBrowsersSendBack() throws Exception {
         String email = uniqueEmail();
         registerVerifiedUserAndLogin(email);
 
-        login(email, PASSWORD)
+        String setCookie = login(email, PASSWORD)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(cookie().exists("refreshToken"))
-                .andExpect(cookie().httpOnly("refreshToken", true));
+                .andExpect(cookie().httpOnly("refreshToken", true))
+                .andExpect(cookie().secure("refreshToken", true))
+                .andExpect(cookie().sameSite("refreshToken", "Strict"))
+                .andExpect(cookie().maxAge("refreshToken", 604800))
+                .andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE);
+
+        // A path, not a URL (C5): with "Path=http://localhost:8080/auth" browsers never
+        // sent the cookie back to /auth/refresh.
+        assertThat(setCookie).contains("Path=/auth;").doesNotContain("http");
     }
 
     @Test
