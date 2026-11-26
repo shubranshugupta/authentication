@@ -9,7 +9,7 @@
 # The tests don't run here: they need Docker themselves. CI runs them before building.
 
 # ---- build ----
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /build
 
 # Dependencies first: they change less often than the code, so this layer stays cached.
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q package -DskipTests \
 RUN java -Djarmode=tools -jar app.jar extract --layers --launcher --destination extracted
 
 # ---- run ----
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 
 # Never as root.
 RUN groupadd --system app && useradd --system --gid app --no-create-home app
