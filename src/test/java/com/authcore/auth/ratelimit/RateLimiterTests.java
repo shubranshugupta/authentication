@@ -13,32 +13,37 @@ import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.QueryTimeoutException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 /** What the integration tests (RateLimitTests) can't show. */
 class RateLimiterTests {
 
-    /** One request waits for the timeout, not all of them. */
+    /** One request waits for the timeout, not all of them. The failure is counted, for an alert (F2). */
     @Test
     void afterRedisFailedNothingIsLimitedAndItIsNotAskedForAWhile() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         when(redis.execute(any(), anyList(), any(Object[].class))).thenThrow(new QueryTimeoutException("timeout"));
-        RateLimiter limiter = new RateLimiter(redis);
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        RateLimiter limiter = new RateLimiter(redis, meters);
 
         for (int i = 0; i < 100; i++)
             assertThatCode(() -> limiter.acquire(RateLimit.LOGIN_PER_IP.forIp("203.0.113.7"))).doesNotThrowAnyException();
 
         assertThat(mockingDetails(redis).getInvocations()).hasSize(1);
+        assertThat(meters.counter("authcore.rate_limit.redis_failures").count()).isEqualTo(1);
     }
 
     @Test
     void theWaitIsRoundedUpToSeconds() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         when(redis.execute(any(), anyList(), any(Object[].class))).thenReturn(1L);
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
-        assertThatThrownBy(() -> new RateLimiter(redis).acquire(RateLimit.LOGIN_PER_IP.forIp("203.0.113.7")))
+        assertThatThrownBy(() -> new RateLimiter(redis, meters).acquire(RateLimit.LOGIN_PER_IP.forIp("203.0.113.7")))
                 .isInstanceOfSatisfying(TooManyRequestsException.class,
                         e -> assertThat(e.getRetryAfterSeconds()).isEqualTo(1));
+        assertThat(meters.counter("authcore.rate_limit.refused", "limit", "LOGIN_PER_IP").count()).isEqualTo(1);
         assertThat(new TooManyRequestsException(Duration.ofMillis(1001)).getRetryAfterSeconds()).isEqualTo(2);
         assertThat(new TooManyRequestsException(Duration.ofSeconds(900)).getRetryAfterSeconds()).isEqualTo(900);
     }

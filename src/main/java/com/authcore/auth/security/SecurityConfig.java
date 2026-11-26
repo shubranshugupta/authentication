@@ -2,6 +2,8 @@ package com.authcore.auth.security;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -36,8 +38,22 @@ public class SecurityConfig {
     private final AuthConfigProperties authConfigProperties;
     private final DelegatedAuthenticationEntryPoint authEntryPoint;
 
+    /**
+     * Actuator answers on its own port only (management.server.port), which must not be
+     * reachable from outside. On the API port, the same paths would need a login.
+     */
+    @Value("${management.server.port:${server.port:8080}}")
+    private int managementPort;
+
+    @Value("${server.port:8080}")
+    private int serverPort;
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // 0 is a random port (in tests), different from the other one.
+        if (managementPort == serverPort && managementPort != 0)
+            throw new IllegalStateException("MANAGEMENT_PORT must differ from SERVER_PORT: "
+                    + "the metrics would be public on the API port.");
         http.csrf(csrf -> csrf
                 .disable())
                 // Uses the corsConfigurationSource bean below. CORS must run inside the
@@ -46,6 +62,8 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(PUBLIC)
+                        .permitAll()
+                        .requestMatchers(EndpointRequest.toAnyEndpoint())
                         .permitAll()
                         .anyRequest()
                         .authenticated())

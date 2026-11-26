@@ -64,6 +64,35 @@ server:
     # Without a proxy keep "none", or clients could choose their address themselves.
     forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
+management:
+    # Health checks and metrics have a port of their own. Keep it inside your network: don't
+    # route it through the reverse proxy, because nothing on it needs a login. It must
+    # differ from SERVER_PORT.
+    server:
+        port: ${MANAGEMENT_PORT:8081}
+    endpoints:
+        web:
+            exposure:
+                include: health, info, prometheus
+    endpoint:
+        health:
+            # /actuator/health/liveness and /actuator/health/readiness, for Kubernetes,
+            # Docker or a load balancer.
+            probes:
+                enabled: true
+            # Which checks are up or down, but no details (versions, hosts).
+            show-components: always
+            group:
+                readiness:
+                    # Nothing works without the database. Not Redis: without it the app still
+                    # works (without rate limits), so it must stay in service.
+                    include: readinessState, db
+    tracing:
+        sampling:
+            # Every request gets a trace id in its log lines. Nothing is exported yet (no
+            # tracing backend), so tracing every request costs next to nothing.
+            probability: 1.0
+
 auth:
     # Where the web app runs. Verification emails link to its /verify-email?token=... page,
     # which must POST the token to /api/v1/auth/email-verification/confirm.

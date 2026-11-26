@@ -38,6 +38,13 @@ spring:
     jpa:
         show-sql: false
 
+logging:
+    structured:
+        # One JSON object per line (Elastic Common Schema), with the request's trace id, for a
+        # log collector such as CloudWatch, Loki or Elasticsearch.
+        format:
+            console: ecs
+
 auth:
     # Checked before anything starts (RequiredSettings). Every variable above that has no
     # default belongs here.
