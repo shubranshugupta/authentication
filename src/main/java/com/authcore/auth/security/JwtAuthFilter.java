@@ -52,11 +52,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(String token, HttpServletRequest request) {
-        String email = jwtService.extractEmail(token);
-        // The exact email: MySQL's comparison ignores case, and V2 changed stored spellings.
-        UserPrincipal principal = userRepository.findByEmail(email)
+        AccessToken accessToken = jwtService.parse(token);
+        UserPrincipal principal = userRepository.findById(accessToken.userId())
+                // The version was raised since, e.g. by a password reset (H6).
+                .filter(user -> user.getTokenVersion() == accessToken.tokenVersion())
                 .map(UserPrincipal::from)
-                .filter(found -> found.email().equals(email))
                 .orElseThrow(() -> new InvalidTokenException(JwtService.INVALID_TOKEN));
 
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

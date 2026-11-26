@@ -47,7 +47,7 @@ class UserServiceTests {
 
     @Test
     void updateProfileChangesOnlyTheName() {
-        when(userRepository.findById(7)).thenReturn(Optional.of(user));
+        when(userRepository.findAndLockById(7)).thenReturn(Optional.of(user));
 
         userService.updateProfile(7, "janet", null);
 

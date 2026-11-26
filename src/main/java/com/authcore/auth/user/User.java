@@ -63,6 +63,15 @@ public class User {
     @Column(name = "is_enabled", nullable = false)
     private boolean enabled;
 
+    /** Part of every access token (H6). */
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion;
+
+    /** Makes every access token issued so far stop working. */
+    public void invalidateAccessTokens() {
+        tokenVersion++;
+    }
+
     // JPA entities compare by database id only (Lombok's @Data compares every field and
     // prints the password hash). getId() (not the field) works on Hibernate
     // proxies; the constant hashCode stays stable when a new entity gets its id.

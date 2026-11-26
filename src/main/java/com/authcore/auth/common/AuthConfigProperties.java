@@ -81,6 +81,11 @@ public class AuthConfigProperties {
 
         @ToString.Exclude
         private String secretKey;
+        /** The "iss" and "aud" of every access token. Tokens with others are refused. */
+        @NotBlank
+        private String issuer;
+        @NotBlank
+        private String audience;
         @Positive
         private long jwtExpiration;
         @Positive

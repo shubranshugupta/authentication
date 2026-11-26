@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionOperations;
 
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.session.RefreshToken;
 import com.authcore.auth.session.RefreshTokenService;
@@ -125,7 +126,7 @@ class AuthServiceTests {
     void loginReturnsBothTokens() {
         User user = user(true);
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
-        when(jwtService.generateToken(EMAIL)).thenReturn("access");
+        when(jwtService.generateToken(new AccessToken(1, 0))).thenReturn("access");
         when(refreshTokenService.createRefreshToken(user))
                 .thenReturn(RefreshToken.builder().refreshToken("refresh").build());
 
@@ -241,6 +242,7 @@ class AuthServiceTests {
         authService.resetPassword(" Jane@Example.com", "12345678", "new");
 
         assertThat(savedUser().getPassword()).isEqualTo("new-hash");
+        assertThat(user.getTokenVersion()).isEqualTo(1);
         verify(refreshTokenService).deleteRefreshToken(user);
     }
 

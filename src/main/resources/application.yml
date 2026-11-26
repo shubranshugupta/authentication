@@ -61,7 +61,12 @@ auth:
     admin-emails: ${AUTH_ADMIN_EMAILS:}
     token:
         secret-key: ${JWT_SECRET_KEY}
-        jwt-expiration: 10800000
+        # Every access token names its issuer and audience, and is refused if they differ.
+        # Give each environment its own, so that their tokens can't be mixed up.
+        issuer: ${JWT_ISSUER:authcore}
+        audience: ${JWT_AUDIENCE:authcore}
+        # 15 minutes. Short, because a stolen access token works until it expires.
+        jwt-expiration: 900000
         refresh-expiration: 604800000
 
     # The refresh-token cookie. Keep the defaults while the frontend runs on the same

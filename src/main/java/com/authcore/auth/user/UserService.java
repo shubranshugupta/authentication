@@ -32,12 +32,17 @@ public class UserService {
 
     /** Null means: keep it. An empty last name removes it. */
     public void updateProfile(Integer userId, @Nullable String firstName, @Nullable String lastName) {
-        User user = getUser(userId);
-        if (firstName != null)
-            user.setFirstName(firstName);
-        if (lastName != null)
-            user.setLastName(lastName.isBlank() ? null : lastName);
-        userRepository.save(user);
+        transaction.run(() -> {
+            // Locked, because saving writes every column: a password reset at the same
+            // moment would otherwise be undone.
+            User user = userRepository.findAndLockById(userId)
+                    .orElseThrow(() -> new UserNotFoundException(userId));
+            if (firstName != null)
+                user.setFirstName(firstName);
+            if (lastName != null)
+                user.setLastName(lastName.isBlank() ? null : lastName);
+            return userRepository.save(user);
+        });
     }
 
     public void requestDeletion(Integer userId) {

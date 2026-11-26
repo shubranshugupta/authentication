@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.session.RefreshTokenService;
 import com.authcore.auth.token.InvalidCodeException;
@@ -81,13 +82,13 @@ public class AuthService {
                 .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
 
         return new TokenPair(
-                jwtService.generateToken(user.getEmail()),
+                accessToken(user),
                 refreshTokenService.createRefreshToken(user).getRefreshToken());
     }
 
     /** Returns a new access token. */
     public String refresh(String refreshToken) {
-        return jwtService.generateToken(refreshTokenService.verifyRefreshToken(refreshToken).getEmail());
+        return accessToken(refreshTokenService.verifyRefreshToken(refreshToken));
     }
 
     /** Sends the verification email again, if there is an account that needs it. */
@@ -124,13 +125,17 @@ public class AuthService {
                 .consumeCode(account.getId(), code, TokenPurpose.PASSWORD_RESET, user -> true)
                 .map(user -> {
                     user.setPassword(passwordEncoder.encode(newPassword));
+                    // Whoever knew the old password may hold tokens.
+                    user.invalidateAccessTokens();
                     userRepository.save(user);
-                    // Whoever knew the old password may hold the refresh token. (The copy in
-                    // the Redis cache goes in Phase 5, C2.)
                     refreshTokenService.deleteRefreshToken(user);
                     return true;
                 }).orElse(false));
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
+    }
+
+    private String accessToken(User user) {
+        return jwtService.generateToken(new AccessToken(user.getId(), user.getTokenVersion()));
     }
 }

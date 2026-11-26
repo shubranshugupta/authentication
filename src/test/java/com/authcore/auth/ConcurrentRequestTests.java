@@ -1,8 +1,7 @@
 package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,6 +13,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
 
@@ -184,6 +184,25 @@ class ConcurrentRequestTests extends IntegrationTest {
             assertThat(statuses).containsOnly(200, 409);
             assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
             assertSentOnce(email, "Delete Account");
+        }
+    }
+
+    /** Saving a profile writes every column, so it could write the old password back. */
+    @Test
+    void profileUpdatesNeverUndoAPasswordReset() throws Exception {
+        for (int round = 0; round < DEADLOCK_ROUNDS; round++) {
+            String email = uniqueEmail();
+            String accessToken = registerVerifiedUserAndLogin(email);
+            requestPasswordReset(email);
+            String otp = passwordResetOtp(email);
+            AtomicBoolean first = new AtomicBoolean(true);
+
+            allAtOnce(() -> first.getAndSet(false) ? confirmPasswordReset(email, otp)
+                    : updateProfile(accessToken, "{\"firstName\": \"janet\"}").andReturn().getResponse().getStatus());
+
+            login(email, PASSWORD).andExpect(status().isUnauthorized());
+            getProfile(accessToken).andExpect(status().isUnauthorized());
+            login(email, "N3w-Str0ng-Passw0rd!").andExpect(status().isOk());
         }
     }
 

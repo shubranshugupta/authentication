@@ -88,6 +88,15 @@ class AuthConfigPropertiesTests {
         assertThat(VALIDATOR.validate(token)).hasSize(2);
     }
 
+    @Test
+    void accessTokensNeedAnIssuerAndAnAudience() {
+        TokenConfigProperties token = token(base64(32));
+        token.setIssuer("");
+        token.setAudience(" ");
+
+        assertThat(VALIDATOR.validate(token)).hasSize(2);
+    }
+
     /** H4: emails link to it, so a missing or wrong one must not go unnoticed. */
     @Test
     void theFrontendUrlMustBeAUrl() {
@@ -117,6 +126,8 @@ class AuthConfigPropertiesTests {
     private static TokenConfigProperties token(String secretKey) {
         TokenConfigProperties token = new TokenConfigProperties();
         token.setSecretKey(secretKey);
+        token.setIssuer("authcore");
+        token.setAudience("authcore");
         token.setJwtExpiration(1);
         token.setRefreshExpiration(1);
         return token;

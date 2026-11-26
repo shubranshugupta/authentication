@@ -13,10 +13,13 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.crypto.SecretKey;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 import org.mockito.invocation.Invocation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -35,6 +38,10 @@ import com.authcore.auth.user.User;
 import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import jakarta.mail.Message;
 import jakarta.mail.Multipart;
 import jakarta.mail.Part;
@@ -71,6 +78,9 @@ public abstract class IntegrationTest {
 
     @MockitoBean
     protected JavaMailSender mailSender;
+
+    @Value("${auth.token.secret-key}")
+    private String jwtSecret;
 
     @BeforeEach
     void stubMailSender() {
@@ -181,6 +191,16 @@ public abstract class IntegrationTest {
     }
 
     // ---- tokens --------------------------------------------------------------------
+
+    /** The key this server signs its access tokens with. */
+    protected SecretKey serverKey() {
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+    }
+
+    /** What an access token says. */
+    protected Claims claims(String accessToken) {
+        return Jwts.parser().verifyWith(serverKey()).build().parseSignedClaims(accessToken).getPayload();
+    }
 
     private static final Pattern LINK_TOKEN = Pattern.compile("token=([A-Za-z0-9_-]{43})");
     private static final Pattern CODE = Pattern.compile(">(\\d{8})<");
