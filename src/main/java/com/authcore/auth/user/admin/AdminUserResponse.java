@@ -1,4 +1,7 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.admin;
+
+import com.authcore.auth.user.Role;
+import com.authcore.auth.user.User;
 
 import java.util.Date;
 

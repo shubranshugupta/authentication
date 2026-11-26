@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.authcore.auth.support.IntegrationTest;
-import com.authcore.auth.user.AdminBootstrap;
+import com.authcore.auth.user.admin.AdminBootstrap;
 import com.authcore.auth.user.Role;
 
 /** What admins can do with users: lock, unlock, log out, and change the role. Each needs the admin's password. */

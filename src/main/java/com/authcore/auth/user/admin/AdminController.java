@@ -1,4 +1,4 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.admin;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;

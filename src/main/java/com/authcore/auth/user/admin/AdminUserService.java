@@ -1,4 +1,4 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.admin;
 
 import java.time.Instant;
 import java.util.function.Consumer;
@@ -13,6 +13,10 @@ import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.security.PasswordConfirmation;
 import com.authcore.auth.security.Reauthentication;
 import com.authcore.auth.session.SessionService;
+import com.authcore.auth.user.Role;
+import com.authcore.auth.user.User;
+import com.authcore.auth.user.UserNotFoundException;
+import com.authcore.auth.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

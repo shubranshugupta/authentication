@@ -1,4 +1,4 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.account;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

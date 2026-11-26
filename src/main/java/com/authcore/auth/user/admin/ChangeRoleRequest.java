@@ -1,4 +1,6 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.admin;
+
+import com.authcore.auth.user.Role;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

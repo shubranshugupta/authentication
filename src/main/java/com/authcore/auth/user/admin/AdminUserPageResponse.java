@@ -1,4 +1,4 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.admin;
 
 import java.util.List;
 
