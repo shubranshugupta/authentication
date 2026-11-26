@@ -8,6 +8,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.audit.AuditEvent;
+import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.security.PasswordConfirmation;
@@ -19,13 +21,11 @@ import com.authcore.auth.user.UserNotFoundException;
 import com.authcore.auth.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * What admins can do with other users. Admins can't lock or demote themselves, so nobody
  * locks themselves out by mistake. Every change needs the admin's password.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminUserService {
@@ -37,6 +37,7 @@ public class AdminUserService {
     private final RetryingTransaction transaction;
     private final AuthConfigProperties properties;
     private final Reauthentication reauthentication;
+    private final AuditLog audit;
 
     /** Users ordered by id. Out-of-range page numbers and sizes are clamped. */
     public AdminUserPageResponse listUsers(int page, int size) {
@@ -67,21 +68,21 @@ public class AdminUserService {
                 found.setLockedAt(Instant.now());
             sessions.endAll(found);
         });
-        log.info("Admin {} locked user {}", admin.userId(), id);
+        audit.record(AuditEvent.USER_LOCKED, id, "by", admin.userId());
         return user;
     }
 
     public AdminUserResponse unlock(PasswordConfirmation admin, Integer id) {
         reauthentication.check(admin);
         AdminUserResponse user = change(id, found -> found.setLockedAt(null));
-        log.info("Admin {} unlocked user {}", admin.userId(), id);
+        audit.record(AuditEvent.USER_UNLOCKED, id, "by", admin.userId());
         return user;
     }
 
     public void endSessions(PasswordConfirmation admin, Integer id) {
         reauthentication.check(admin);
         change(id, sessions::endAll);
-        log.info("Admin {} logged user {} out of all devices", admin.userId(), id);
+        audit.record(AuditEvent.USER_LOGGED_OUT, id, "by", admin.userId());
     }
 
     /** Takes effect with the user's next request: roles are never read from tokens. */
@@ -94,7 +95,7 @@ public class AdminUserService {
                         "This email is listed in AUTH_ADMIN_EMAILS, so the next start would make the user an admin again. Remove it there first.");
             found.setRole(role);
         });
-        log.info("Admin {} gave the {} role to user {}", admin.userId(), role, id);
+        audit.record(AuditEvent.ROLE_CHANGED, id, "role", role, "by", admin.userId());
         return user;
     }
 

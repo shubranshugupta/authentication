@@ -1,17 +1,23 @@
 package com.authcore.auth.auth;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.audit.AuditEvent;
+import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.ratelimit.LoginThrottle;
+import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.security.LoginDetails;
@@ -46,6 +52,7 @@ public class AuthService {
     private final OneTimeTokenService tokens;
     private final RetryingTransaction transaction;
     private final AuthConfigProperties authConfigProperties;
+    private final AuditLog audit;
 
     public void register(RegisterRequest request) {
         String email = EmailAddresses.normalize(request.getEmail());
@@ -78,14 +85,23 @@ public class AuthService {
 
     public TokenPair login(String email, String password, ClientInfo client) {
         String normalized = EmailAddresses.normalize(email);
-        loginThrottle.beforeCheck(normalized, client.ip());
+        try {
+            loginThrottle.beforeCheck(normalized, client.ip());
+        } catch (TooManyRequestsException e) {
+            loginFailed(normalized, "RATE_LIMITED");
+            throw e;
+        }
         LoginDetails user = checkPassword(normalized, password, client);
         loginThrottle.succeeded(normalized, client.ip());
 
-        return sessions.open(user.getId(), user.getTokenVersion(), client)
-                .map(this::tokenPair)
+        SessionTokens session = sessions.open(user.getId(), user.getTokenVersion(), client)
                 // The account was deleted, or its password changed, a moment ago.
-                .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
+                .orElseThrow(() -> {
+                    loginFailed(normalized, "ACCOUNT_CHANGED");
+                    return new BadCredentialsException("Bad credentials");
+                });
+        audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId());
+        return tokenPair(session);
     }
 
     private LoginDetails checkPassword(String email, String password, ClientInfo client) {
@@ -95,12 +111,33 @@ public class AuthService {
         } catch (BadCredentialsException e) {
             // H2: an unknown email fails exactly like a wrong password (401), instead of
             // revealing that it isn't registered.
+            loginFailed(email, null);
+            throw e;
+        } catch (DisabledException e) {
+            loginThrottle.notAGuess(email, client.ip());
+            loginFailed(email, "EMAIL_NOT_VERIFIED");
+            throw e;
+        } catch (LockedException e) {
+            loginThrottle.notAGuess(email, client.ip());
+            loginFailed(email, "ACCOUNT_LOCKED");
             throw e;
         } catch (AuthenticationException e) {
             // E.g. the email isn't verified, or the database failed.
             loginThrottle.notAGuess(email, client.ip());
             throw e;
         }
+    }
+
+    /**
+     * The audit log gets the account's id, never the email (F2). Both an unknown and a known
+     * email cost this one query, so the time taken doesn't tell them apart (H2).
+     *
+     * @param reason null for a wrong password or an unknown email
+     */
+    private void loginFailed(String email, @Nullable String reason) {
+        Integer userId = userRepository.findByEmail(email).map(User::getId).orElse(null);
+        audit.record(AuditEvent.LOGIN_FAILED, userId, "reason",
+                reason != null ? reason : userId != null ? "WRONG_PASSWORD" : "UNKNOWN_ACCOUNT");
     }
 
     public TokenPair refresh(String refreshToken, ClientInfo client) {
@@ -154,6 +191,7 @@ public class AuthService {
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
         loginThrottle.passwordChanged(normalized, ip);
+        audit.record(AuditEvent.PASSWORD_RESET, account.getId());
     }
 
     private static boolean canResetPassword(User user) {

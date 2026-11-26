@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.jspecify.annotations.Nullable;
@@ -17,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.authcore.auth.audit.AuditEvent;
+import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.security.InvalidTokenException;
@@ -54,6 +57,7 @@ public class SessionService {
     private final UserRepository userRepository;
     private final RetryingTransaction transaction;
     private final AuthConfigProperties properties;
+    private final AuditLog audit;
 
     /**
      * Opens a session for a user whose password was just checked.
@@ -79,6 +83,8 @@ public class SessionService {
      */
     public SessionTokens refresh(String token, ClientInfo client) {
         Refresh refresh = transaction.run(() -> tryToRefresh(hash(token), client));
+        if (refresh.reusedBy() != null)
+            audit.record(AuditEvent.REFRESH_TOKEN_REUSED, refresh.reusedBy());
         // Only now: an exception inside would roll back what ended the sessions.
         if (refresh.refused() != null)
             throw refresh.refused();
@@ -111,7 +117,7 @@ public class SessionService {
 
         log.warn("A used refresh token of user {} showed up again: ending all of their sessions", user.getId());
         endAll(user);
-        return Refresh.refused(new InvalidTokenException(INVALID_TOKEN));
+        return Refresh.reused(user.getId(), new InvalidTokenException(INVALID_TOKEN));
     }
 
     /** Ends the session of this refresh token, if there still is one. */
@@ -119,11 +125,11 @@ public class SessionService {
         String hash = hash(token);
         transaction.run(() -> refreshTokenRepository.findUserId(hash)
                 .flatMap(userRepository::findAndLockById)
-                .flatMap(user -> refreshTokenRepository.findByTokenHash(hash))
-                .map(found -> {
+                .flatMap(user -> refreshTokenRepository.findByTokenHash(hash).map(found -> {
                     sessionRepository.end(found.getSessionId());
-                    return found;
-                }));
+                    return Map.entry(user.getId(), found.getSessionId());
+                })))
+                .ifPresent(ended -> audit.record(AuditEvent.LOGOUT, ended.getKey(), "sessionId", ended.getValue()));
     }
 
     /** The sessions of a user, the last used one first. */
@@ -144,13 +150,14 @@ public class SessionService {
                 }))
                 // Also if it's somebody else's: whether that exists is none of their business.
                 .orElseThrow(() -> new SessionNotFoundException(sessionId));
+        audit.record(AuditEvent.SESSION_ENDED, userId, "sessionId", sessionId);
     }
 
     public void endAll(Integer userId) {
         transaction.run(() -> userRepository.findAndLockById(userId).map(user -> {
             endAll(user);
             return user;
-        }));
+        })).ifPresent(user -> audit.record(AuditEvent.ALL_SESSIONS_ENDED, userId));
     }
 
     /** Ends all sessions of this user, which the caller has locked. */
@@ -199,13 +206,18 @@ public class SessionService {
     }
 
     /** Either the tokens, or why there are none. */
-    private record Refresh(@Nullable SessionTokens tokens, @Nullable RuntimeException refused) {
+    private record Refresh(@Nullable SessionTokens tokens, @Nullable RuntimeException refused, @Nullable Integer reusedBy) {
         static Refresh of(SessionTokens tokens) {
-            return new Refresh(tokens, null);
+            return new Refresh(tokens, null, null);
         }
 
         static Refresh refused(RuntimeException reason) {
-            return new Refresh(null, reason);
+            return new Refresh(null, reason, null);
+        }
+
+        /** A used token came back, and this user's sessions were ended. */
+        static Refresh reused(Integer userId, RuntimeException reason) {
+            return new Refresh(null, reason, userId);
         }
     }
 }
