@@ -7,10 +7,13 @@ updates:
     schedule:
       interval: weekly
     groups:
-      # Spring Boot manages most versions: one pull request for all of them.
+      # One pull request for Spring Boot and springdoc, tested together: Spring Boot
+      # manages most versions, and each springdoc line is made for one Spring Boot line
+      # (3.1 for Boot 4.1, 3.2 for Boot 4.2).
       spring-boot:
         patterns:
           - "org.springframework.boot:*"
+          - "org.springdoc:*"
 
   - package-ecosystem: github-actions
     directory: /
@@ -21,3 +24,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Only Java 25.x updates (security fixes). Java 25 is a long-term support version;
+      # move to the next one on purpose, with pom.xml and CI, not through a bot PR.
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
