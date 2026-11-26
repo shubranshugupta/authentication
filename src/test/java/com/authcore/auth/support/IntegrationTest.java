@@ -32,6 +32,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.authcore.auth.token.TokenPurpose;
 import com.authcore.auth.user.User;
@@ -204,6 +205,14 @@ public abstract class IntegrationTest {
                 .content("""
                         {"otp": "%s", "password": "%s"}
                         """.formatted(otp, password)));
+    }
+
+    /** The request comes from this address (by default every request has its own). */
+    protected static RequestPostProcessor from(String ip) {
+        return request -> {
+            request.setRemoteAddr(ip);
+            return request;
+        };
     }
 
     protected static MockHttpServletRequestBuilder as(String accessToken, MockHttpServletRequestBuilder request) {

@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.MsgResponse;
+import com.authcore.auth.ratelimit.RateLimit;
+import com.authcore.auth.ratelimit.RateLimiter;
 import com.authcore.auth.session.ClientInfo;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,10 +38,12 @@ public class AuthController {
     private static final String RESET_REQUESTED = "If an account with this email exists, a password reset email has been sent.";
 
     private final AuthService authService;
+    private final RateLimiter rateLimiter;
     private final AuthConfigProperties authConfigProperties;
 
     @PostMapping("/register")
-    public ResponseEntity<MsgResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<MsgResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.REGISTRATION_PER_IP.forIp(http.getRemoteAddr()));
         authService.register(request);
         return message("Verification email sent");
     }
@@ -67,27 +71,39 @@ public class AuthController {
     }
 
     @PostMapping("/email-verification")
-    public ResponseEntity<MsgResponse> resendVerification(@Valid @RequestBody AccountEmailRequest request) {
+    public ResponseEntity<MsgResponse> resendVerification(@Valid @RequestBody AccountEmailRequest request,
+            HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.VERIFICATION_EMAIL_PER_IP.forIp(http.getRemoteAddr()),
+                RateLimit.VERIFICATION_EMAIL_PER_ACCOUNT.forAccount(request.getEmail()));
         authService.resendVerification(request.getEmail());
         return message(VERIFICATION_REQUESTED);
     }
 
     /** A POST, so that link previews and prefetching can't use up the link (H4). */
     @PostMapping("/email-verification/confirm")
-    public ResponseEntity<MsgResponse> verifyEmail(@Valid @RequestBody ConfirmEmailRequest request) {
+    public ResponseEntity<MsgResponse> verifyEmail(@Valid @RequestBody ConfirmEmailRequest request,
+            HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.VERIFICATION_CONFIRM_PER_IP.forIp(http.getRemoteAddr()));
         authService.verifyEmail(request.getToken());
         return message("Email verified successfully");
     }
 
     @PostMapping("/password-reset")
-    public ResponseEntity<MsgResponse> requestPasswordReset(@Valid @RequestBody AccountEmailRequest request) {
+    public ResponseEntity<MsgResponse> requestPasswordReset(@Valid @RequestBody AccountEmailRequest request,
+            HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.RESET_EMAIL_PER_IP.forIp(http.getRemoteAddr()),
+                RateLimit.RESET_EMAIL_PER_ACCOUNT.forAccount(request.getEmail()));
         authService.requestPasswordReset(request.getEmail());
         return message(RESET_REQUESTED);
     }
 
     @PostMapping("/password-reset/confirm")
-    public ResponseEntity<MsgResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        authService.resetPassword(request.getEmail(), request.getOtp(), request.getPassword());
+    public ResponseEntity<MsgResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        rateLimiter.acquire(RateLimit.RESET_CONFIRM_PER_IP.forIp(ip),
+                RateLimit.RESET_CONFIRM_PER_IP_AND_ACCOUNT.forIpAndAccount(ip, request.getEmail()));
+        authService.resetPassword(request.getEmail(), request.getOtp(), request.getPassword(), ip);
         return message("Password reset successfully");
     }
 

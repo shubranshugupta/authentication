@@ -37,6 +37,8 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "User already exists"),
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "Session not found"),
 
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
+
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
 
     final HttpStatus status;

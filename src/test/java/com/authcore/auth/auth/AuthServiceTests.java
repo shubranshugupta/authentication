@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -23,12 +25,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.ratelimit.LoginThrottle;
+import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.security.LoginDetails;
@@ -61,6 +66,8 @@ class AuthServiceTests {
     @Mock
     private AuthenticationManager manager;
     @Mock
+    private LoginThrottle loginThrottle;
+    @Mock
     private OneTimeTokenService tokens;
 
     private final AuthConfigProperties properties = new AuthConfigProperties();
@@ -69,7 +76,7 @@ class AuthServiceTests {
     @BeforeEach
     void createService() {
         authService = new AuthService(userRepository, passwordEncoder, jwtService, sessions, manager,
-                tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties);
+                loginThrottle, tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties);
     }
 
     // ---- registration --------------------------------------------------------------
@@ -136,6 +143,8 @@ class AuthServiceTests {
 
         assertThat(authService.login("  Jane@Example.com ", "plain", CLIENT)).isEqualTo(new TokenPair("access", "refresh", WEEK));
         verify(manager).authenticate(new UsernamePasswordAuthenticationToken(EMAIL, "plain"));
+        verify(loginThrottle).beforeCheck(EMAIL, CLIENT.ip());
+        verify(loginThrottle).succeeded(EMAIL, CLIENT.ip());
     }
 
     @Test
@@ -144,6 +153,26 @@ class AuthServiceTests {
 
         assertThatThrownBy(() -> authService.login(EMAIL, "wrong", CLIENT)).isInstanceOf(BadCredentialsException.class);
         verifyNoInteractions(userRepository, jwtService, sessions);
+        verify(loginThrottle).beforeCheck(EMAIL, CLIENT.ip());
+        verifyNoMoreInteractions(loginThrottle);
+    }
+
+    /** Checking one is expensive on purpose (bcrypt). */
+    @Test
+    void afterTooManyWrongPasswordsNoneIsChecked() {
+        doThrow(new TooManyRequestsException(WEEK)).when(loginThrottle).beforeCheck(EMAIL, CLIENT.ip());
+
+        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT)).isInstanceOf(TooManyRequestsException.class);
+        verifyNoInteractions(manager, sessions);
+    }
+
+    /** A database outage must not lock everybody out. */
+    @Test
+    void onlyWrongPasswordsCountAsGuesses() {
+        when(manager.authenticate(any())).thenThrow(new InternalAuthenticationServiceException("database is down"));
+
+        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT)).isInstanceOf(InternalAuthenticationServiceException.class);
+        verify(loginThrottle).notAGuess(EMAIL, CLIENT.ip());
     }
 
     @Test
@@ -221,10 +250,10 @@ class AuthServiceTests {
         when(tokens.consumeCode(any(), any(), any(), any())).thenReturn(Optional.empty());
 
         for (String email : List.of("unknown@example.com", "unverified@example.com", EMAIL))
-            assertThatThrownBy(() -> authService.resetPassword(email, "12345678", "new"))
+            assertThatThrownBy(() -> authService.resetPassword(email, "12345678", "new", CLIENT.ip()))
                     .isInstanceOf(InvalidCodeException.class).hasMessage(AuthService.INVALID_CODE);
         verify(userRepository, never()).save(any());
-        verifyNoInteractions(passwordEncoder, sessions);
+        verifyNoInteractions(passwordEncoder, sessions, loginThrottle);
     }
 
     // ---- verification and reset ----------------------------------------------------
@@ -255,10 +284,11 @@ class AuthServiceTests {
         when(tokens.consumeCode(eq(1), eq("12345678"), eq(TokenPurpose.PASSWORD_RESET), any())).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("new")).thenReturn("new-hash");
 
-        authService.resetPassword(" Jane@Example.com", "12345678", "new");
+        authService.resetPassword(" Jane@Example.com", "12345678", "new", CLIENT.ip());
 
         assertThat(savedUser().getPassword()).isEqualTo("new-hash");
         verify(sessions).endAll(user);
+        verify(loginThrottle).passwordChanged(EMAIL, CLIENT.ip());
     }
 
     // ---- helpers -------------------------------------------------------------------

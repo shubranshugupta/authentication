@@ -143,9 +143,6 @@ class SessionApiTests extends IntegrationTest {
                         {"email": "%s", "password": "%s"}
                         """.formatted(email, PASSWORD))
                 .header(HttpHeaders.USER_AGENT, device)
-                .with(request -> {
-                    request.setRemoteAddr(ip);
-                    return request;
-                }));
+                .with(from(ip)));
     }
 }

@@ -4,12 +4,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.ratelimit.LoginThrottle;
 import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.security.LoginDetails;
@@ -40,6 +42,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final SessionService sessions;
     private final AuthenticationManager manager;
+    private final LoginThrottle loginThrottle;
     private final OneTimeTokenService tokens;
     private final RetryingTransaction transaction;
     private final AuthConfigProperties authConfigProperties;
@@ -74,15 +77,30 @@ public class AuthService {
     }
 
     public TokenPair login(String email, String password, ClientInfo client) {
-        // H2: an unknown email fails exactly like a wrong password (401), instead of
-        // revealing that it isn't registered.
-        LoginDetails user = (LoginDetails) manager.authenticate(
-                new UsernamePasswordAuthenticationToken(EmailAddresses.normalize(email), password)).getPrincipal();
+        String normalized = EmailAddresses.normalize(email);
+        loginThrottle.beforeCheck(normalized, client.ip());
+        LoginDetails user = checkPassword(normalized, password, client);
+        loginThrottle.succeeded(normalized, client.ip());
 
         return sessions.open(user.getId(), user.getTokenVersion(), client)
                 .map(this::tokenPair)
                 // The account was deleted, or its password changed, a moment ago.
                 .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
+    }
+
+    private LoginDetails checkPassword(String email, String password, ClientInfo client) {
+        try {
+            return (LoginDetails) manager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, password)).getPrincipal();
+        } catch (BadCredentialsException e) {
+            // H2: an unknown email fails exactly like a wrong password (401), instead of
+            // revealing that it isn't registered.
+            throw e;
+        } catch (AuthenticationException e) {
+            // E.g. the email isn't verified, or the database failed.
+            loginThrottle.notAGuess(email, client.ip());
+            throw e;
+        }
     }
 
     public TokenPair refresh(String refreshToken, ClientInfo client) {
@@ -118,8 +136,9 @@ public class AuthService {
                 .ifPresent(user -> tokens.issue(user.getId(), TokenPurpose.PASSWORD_RESET));
     }
 
-    public void resetPassword(String email, String code, String newPassword) {
-        User account = userRepository.findByEmail(EmailAddresses.normalize(email))
+    public void resetPassword(String email, String code, String newPassword, String ip) {
+        String normalized = EmailAddresses.normalize(email);
+        User account = userRepository.findByEmail(normalized)
                 .filter(User::isEnabled)
                 .orElseThrow(() -> new InvalidCodeException(INVALID_CODE));
 
@@ -134,6 +153,7 @@ public class AuthService {
                 }).orElse(false));
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
+        loginThrottle.passwordChanged(normalized, ip);
     }
 
     private TokenPair tokenPair(SessionTokens session) {

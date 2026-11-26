@@ -48,10 +48,7 @@ class SessionTests extends IntegrationTest {
                 .containsEntry("ip", "203.0.113.7")
                 .containsEntry("device", "Firefox " + "x".repeat(247));
 
-        mvc.perform(post("/api/v1/auth/refresh").cookie(cookie).with(request -> {
-            request.setRemoteAddr("2001:db8::1");
-            return request;
-        })).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/refresh").cookie(cookie).with(from("2001:db8::1"))).andExpect(status().isOk());
 
         assertThat(jdbc.queryForMap("select ip, device from user_sessions where user_id = ?", user(email).getId()))
                 .containsEntry("ip", "2001:db8::1")
@@ -320,10 +317,7 @@ class SessionTests extends IntegrationTest {
     private ResultActions loginFrom(String ip, String device, String email) throws Exception {
         return mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\": \"%s\", \"password\": \"%s\"}".formatted(email, PASSWORD))
-                .header(HttpHeaders.USER_AGENT, device).with(request -> {
-            request.setRemoteAddr(ip);
-            return request;
-        }));
+                .header(HttpHeaders.USER_AGENT, device).with(from(ip)));
     }
 
     private int sessions(String email) {

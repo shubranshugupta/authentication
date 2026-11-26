@@ -1,7 +1,10 @@
 package com.authcore.auth.security;
 
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -62,6 +65,8 @@ public class SecurityConfig {
         config.setAllowedOrigins(authConfigProperties.getCors().getAllowedOrigins());
         config.setAllowedMethods(authConfigProperties.getCors().getAllowedMethods());
         config.setAllowedHeaders(authConfigProperties.getCors().getAllowedHeaders());
+        // Scripts can't read it otherwise.
+        config.setExposedHeaders(List.of(HttpHeaders.RETRY_AFTER));
         // Lets the frontend send and receive the refresh-token cookie
         // (fetch with credentials: "include"). Requires exact origins, never "*".
         config.setAllowCredentials(true);

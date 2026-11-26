@@ -7,6 +7,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.InvalidTokenException;
 import com.authcore.auth.security.TokenExpireException;
 import com.authcore.auth.session.SessionNotFoundException;
@@ -106,6 +108,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(SessionNotFoundException e) {
         return problem(ErrorCode.SESSION_NOT_FOUND, e.getMessage());
+    }
+
+    // ---- rate limits ---------------------------------------------------------------
+
+    @ExceptionHandler
+    ResponseEntity<ProblemDetail> handle(TooManyRequestsException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .body(problem(ErrorCode.TOO_MANY_REQUESTS, e.getMessage()));
     }
 
     // ---- everything else -----------------------------------------------------------
