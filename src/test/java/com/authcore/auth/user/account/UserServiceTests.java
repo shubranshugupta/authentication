@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionOperations;
 
+import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.OneTimeTokenService;
@@ -42,7 +45,8 @@ class UserServiceTests {
     @BeforeEach
     void createService() {
         userService = new UserService(userRepository, tokens,
-                new RetryingTransaction(TransactionOperations.withoutTransaction()), passwordEncoder);
+                new RetryingTransaction(TransactionOperations.withoutTransaction()), passwordEncoder,
+                new AuditLog(new SimpleMeterRegistry()));
     }
 
     private final User user = User.builder().id(7).email("jane@example.com").firstName("jane").lastName("doe")

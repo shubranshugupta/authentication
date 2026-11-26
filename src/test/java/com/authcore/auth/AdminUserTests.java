@@ -1,11 +1,11 @@
 package com.authcore.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +18,7 @@ import com.authcore.auth.security.UserPrincipal;
 import com.authcore.auth.support.IntegrationTest;
 import com.authcore.auth.user.admin.AdminBootstrap;
 import com.authcore.auth.user.Role;
+import com.jayway.jsonpath.JsonPath;
 
 /** H7: role names Spring can check, and the read-only admin API. */
 class AdminUserTests extends IntegrationTest {
@@ -86,13 +87,24 @@ class AdminUserTests extends IntegrationTest {
         register(alice, PASSWORD);
         register(bob, PASSWORD);
 
-        getAs(admin, USERS + "?size=100")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.users[*].email", hasItems(alice, bob)))
-                .andExpect(jsonPath("$.users[0].password").doesNotExist())
-                .andExpect(jsonPath("$.users[0].role").exists())
-                .andExpect(jsonPath("$.page").value(0))
-                .andExpect(jsonPath("$.size").value(100));
+        // Every page: other test classes share the database, so there may be more users
+        // than fit on one, and new ones (the highest ids) come last.
+        List<String> emails = new ArrayList<>();
+        int totalPages;
+        int page = 0;
+        do {
+            String body = getAs(admin, USERS + "?size=100&page=" + page)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.page").value(page))
+                    .andExpect(jsonPath("$.size").value(100))
+                    .andExpect(jsonPath("$.users[*].password").isEmpty())
+                    .andExpect(jsonPath("$.users[0].role").exists())
+                    .andReturn().getResponse().getContentAsString();
+            emails.addAll(JsonPath.read(body, "$.users[*].email"));
+            totalPages = JsonPath.read(body, "$.totalPages");
+        } while (++page < totalPages);
+
+        assertThat(emails).contains(alice, bob).doesNotHaveDuplicates();
     }
 
     @Test

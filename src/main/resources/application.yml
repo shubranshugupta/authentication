@@ -19,6 +19,15 @@ spring:
             # transaction keeps seeing what was there at its first read, even after waiting
             # for a lock: one verification link could then be used twice at the same moment.
             transaction-isolation: TRANSACTION_READ_COMMITTED
+            # Connections per server. All servers together must stay below MySQL's
+            # max_connections (151 by default).
+            maximum-pool-size: ${DB_POOL_SIZE:10}
+            # A request waits at most 5 seconds for a free connection, then fails, instead of
+            # hanging for the default 30 seconds.
+            connection-timeout: 5000
+            # Idle connections are used every 5 minutes, so that a firewall or proxy between
+            # here and the database doesn't drop them unnoticed.
+            keepalive-time: 300000
 
     jpa:
         hibernate:
@@ -55,6 +64,43 @@ server:
     # Without a proxy keep "none", or clients could choose their address themselves.
     forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
+# The OpenAPI description (/v3/api-docs) and Swagger UI (/swagger-ui.html), F3. On by
+# default, off by default in prod (application-prod.yml).
+springdoc:
+    api-docs:
+        enabled: ${API_DOCS_ENABLED:true}
+    swagger-ui:
+        enabled: ${API_DOCS_ENABLED:true}
+
+management:
+    # Health checks and metrics have a port of their own. Keep it inside your network: don't
+    # route it through the reverse proxy, because nothing on it needs a login. It must
+    # differ from SERVER_PORT.
+    server:
+        port: ${MANAGEMENT_PORT:8081}
+    endpoints:
+        web:
+            exposure:
+                include: health, info, prometheus
+    endpoint:
+        health:
+            # /actuator/health/liveness and /actuator/health/readiness, for Kubernetes,
+            # Docker or a load balancer.
+            probes:
+                enabled: true
+            # Which checks are up or down, but no details (versions, hosts).
+            show-components: always
+            group:
+                readiness:
+                    # Nothing works without the database. Not Redis: without it the app still
+                    # works (without rate limits), so it must stay in service.
+                    include: readinessState, db
+    tracing:
+        sampling:
+            # Every request gets a trace id in its log lines. Nothing is exported yet (no
+            # tracing backend), so tracing every request costs next to nothing.
+            probability: 1.0
+
 auth:
     # Where the web app runs. Verification emails link to its /verify-email?token=... page,
     # which must POST the token to /api/v1/auth/email-verification/confirm.
@@ -74,6 +120,12 @@ auth:
         # A session ends 7 days after it was last used, and 30 days after the login at the latest.
         refresh-expiration: 604800000
         session-expiration: 2592000000
+
+    # Deletes expired sessions, used refresh tokens older than the refresh expiration, and
+    # expired codes (M5). Hourly at minute 7; Spring's cron format is "second minute hour
+    # day month weekday", and "-" turns the job off.
+    cleanup:
+        cron: ${CLEANUP_CRON:0 7 * * * *}
 
     # The refresh-token cookie. Keep the defaults while the frontend runs on the same
     # site as the API (e.g. localhost:3000 -> localhost:8080). For a frontend on another

@@ -1,0 +1,23 @@
+# Pull requests for new versions of the dependencies (F4). Security fixes come at once
+# (turn on "Dependabot security updates" in the repository settings); the rest weekly.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # Spring Boot manages most versions: one pull request for all of them.
+      spring-boot:
+        patterns:
+          - "org.springframework.boot:*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

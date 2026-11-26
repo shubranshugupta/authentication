@@ -1,6 +1,5 @@
 package com.authcore.auth.user;
 
-import java.sql.Date;
 import java.time.Instant;
 
 import org.hibernate.annotations.CreationTimestamp;
@@ -12,6 +11,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
@@ -32,7 +32,7 @@ import lombok.ToString;
 @Table(name = "users")
 public class User {
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false, nullable = false)
     private Integer id;
 
@@ -52,11 +52,11 @@ public class User {
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)
-    private Date createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private Date updatedAt;
+    private Instant updatedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)

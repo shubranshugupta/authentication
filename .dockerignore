@@ -1,0 +1,7 @@
+# Only what the Dockerfile copies: the Maven wrapper, pom.xml and src/.
+# Above all, never send secrets (env.properties) into an image.
+*
+!.mvn/
+!mvnw
+!pom.xml
+!src/

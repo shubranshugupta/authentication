@@ -1,5 +1,7 @@
 package com.authcore.auth.user;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,4 +17,9 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")
     Optional<User> findAndLockById(Integer id);
+
+    /** Locks several users, in id order like everywhere else, so that two of these can't deadlock. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id in :ids order by u.id")
+    List<User> lockAll(Collection<Integer> ids);
 }

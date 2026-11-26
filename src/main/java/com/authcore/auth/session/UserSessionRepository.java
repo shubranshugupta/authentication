@@ -1,9 +1,11 @@
 package com.authcore.auth.session;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -31,4 +33,14 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     @Modifying
     @Query("delete from UserSession s where s.userId = :userId and s.expiresAt <= :now")
     void deleteExpired(Integer userId, Instant now);
+
+    // ---- cleanup (SessionCleanup) ----
+
+    @Query("select distinct s.userId from UserSession s where s.expiresAt <= :now")
+    List<Integer> findUsersWithExpiredSessions(Instant now, Pageable page);
+
+    /** Their refresh tokens go too (on delete cascade). */
+    @Modifying
+    @Query("delete from UserSession s where s.userId in :userIds and s.expiresAt <= :now")
+    int deleteExpired(Collection<Integer> userIds, Instant now);
 }

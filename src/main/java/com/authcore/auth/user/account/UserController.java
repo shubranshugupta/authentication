@@ -14,12 +14,14 @@ import com.authcore.auth.ratelimit.RateLimit;
 import com.authcore.auth.ratelimit.RateLimiter;
 import com.authcore.auth.security.UserPrincipal;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/users/me")
 @RequiredArgsConstructor
+@Tag(name = "My account", description = "The logged-in user's profile and account deletion")
 public class UserController {
     private final UserService userService;
     private final RateLimiter rateLimiter;

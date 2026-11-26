@@ -16,6 +16,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +37,7 @@ import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.ratelimit.LoginThrottle;
 import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.AccessToken;
+import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.security.LoginDetails;
 import com.authcore.auth.session.ClientInfo;
@@ -76,7 +79,8 @@ class AuthServiceTests {
     @BeforeEach
     void createService() {
         authService = new AuthService(userRepository, passwordEncoder, jwtService, sessions, manager,
-                loginThrottle, tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties);
+                loginThrottle, tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties,
+                new AuditLog(new SimpleMeterRegistry()));
     }
 
     // ---- registration --------------------------------------------------------------
@@ -152,7 +156,10 @@ class AuthServiceTests {
         when(manager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
 
         assertThatThrownBy(() -> authService.login(EMAIL, "wrong", CLIENT)).isInstanceOf(BadCredentialsException.class);
-        verifyNoInteractions(userRepository, jwtService, sessions);
+        verifyNoInteractions(jwtService, sessions);
+        // Only read, for the audit log's user id.
+        verify(userRepository).findByEmail(EMAIL);
+        verifyNoMoreInteractions(userRepository);
         verify(loginThrottle).beforeCheck(EMAIL, CLIENT.ip());
         verifyNoMoreInteractions(loginThrottle);
     }

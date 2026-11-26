@@ -1,9 +1,9 @@
 package com.authcore.auth.user.admin;
 
+import java.time.Instant;
+
 import com.authcore.auth.user.Role;
 import com.authcore.auth.user.User;
-
-import java.util.Date;
 
 /** A user as admins see it. Never includes the password hash or any token. */
 public record AdminUserResponse(
@@ -14,8 +14,8 @@ public record AdminUserResponse(
         Role role,
         boolean emailVerified,
         boolean locked,
-        Date createdAt,
-        Date updatedAt) {
+        Instant createdAt,
+        Instant updatedAt) {
 
     public static AdminUserResponse from(User user) {
         return new AdminUserResponse(

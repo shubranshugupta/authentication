@@ -2,11 +2,8 @@
 # No files are imported and there are no defaults for hosts or credentials:
 # set every variable below in the environment (or a secret manager).
 #
-# Note: only JWT_SECRET_KEY (must be a base64 key), MAIL_FROM (must be an email address) and
-# FRONTEND_URL (must be a URL) stop startup when missing (AuthConfigProperties validates
-# them). A missing DB_*, REDIS_* or MAIL_HOST/USERNAME/PASSWORD variable is passed on as the
-# literal text "${NAME}" and only fails on first use. A startup check for this is planned
-# (IMPROVEMENTS.md, M3, Phase 6).
+# The startup stops, naming all of them, if one of the variables without a default is
+# missing or empty (M3).
 spring:
     datasource:
         url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_DATABASE}
@@ -40,3 +37,26 @@ spring:
 
     jpa:
         show-sql: false
+
+logging:
+    structured:
+        # One JSON object per line (Elastic Common Schema), with the request's trace id, for a
+        # log collector such as CloudWatch, Loki or Elasticsearch.
+        format:
+            console: ecs
+
+springdoc:
+    # The API description and Swagger UI map out the whole API: off unless API_DOCS_ENABLED=true.
+    api-docs:
+        enabled: ${API_DOCS_ENABLED:false}
+    swagger-ui:
+        enabled: ${API_DOCS_ENABLED:false}
+
+auth:
+    # Checked before anything starts (RequiredSettings). Every variable above that has no
+    # default belongs here.
+    required-settings: >-
+        DB_HOST, DB_DATABASE, DB_USER, DB_PASSWORD,
+        REDIS_HOST, REDIS_PASSWORD,
+        MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM,
+        JWT_SECRET_KEY, FRONTEND_URL

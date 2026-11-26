@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
+import org.slf4j.MDC;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
@@ -142,7 +143,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(Exception e) {
         log.error(e.getMessage(), e);
-        return problem(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred.");
+        ProblemDetail problem = problem(ErrorCode.INTERNAL_ERROR, "An unexpected error occurred.");
+        // The log lines of this request have it too (F2). Only here: other answers must
+        // stay the same for everyone (H2).
+        String traceId = MDC.get("traceId");
+        if (traceId != null)
+            problem.setProperty("traceId", traceId);
+        return problem;
     }
 
     // ---- invalid input (H1) --------------------------------------------------------

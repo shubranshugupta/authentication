@@ -19,6 +19,8 @@ import org.thymeleaf.context.Context;
 
 import com.authcore.auth.common.AuthConfigProperties;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ public class EmailListener {
     private final TemplateEngine templateEngine;
     private final JavaMailSender mailSender;
     private final AuthConfigProperties authConfigProperties;
+    private final MeterRegistry meters;
 
     // fallbackExecution: without a transaction, send it now. By default it would be ignored.
     @Async(EmailConfig.EMAIL_EXECUTOR)
@@ -56,6 +59,7 @@ public class EmailListener {
                 mailSender.send(message);
                 return null;
             });
+            count(email, "sent");
         } catch (RetryException e) {
             logFailure(email, e.getCause());
         } catch (Exception e) {
@@ -80,7 +84,12 @@ public class EmailListener {
     }
 
     /** Never the variables: they hold codes and links (H2). */
-    private static void logFailure(EmailRequested email, Throwable e) {
+    private void logFailure(EmailRequested email, Throwable e) {
         log.error("Email {} could not be sent", email.template(), e);
+        count(email, "failed");
+    }
+
+    private void count(EmailRequested email, String outcome) {
+        meters.counter("authcore.emails", "template", email.template(), "outcome", outcome).increment();
     }
 }

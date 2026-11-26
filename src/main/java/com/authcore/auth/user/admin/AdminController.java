@@ -17,6 +17,7 @@ import com.authcore.auth.security.PasswordConfirmation;
 import com.authcore.auth.security.UserPrincipal;
 import com.authcore.auth.session.ClientInfo;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/v1/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
+@Tag(name = "Admin", description = "Users, for admins only")
 public class AdminController {
     private final AdminUserService adminUserService;
 

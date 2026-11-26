@@ -13,12 +13,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.authcore.auth.common.MsgResponse;
 import com.authcore.auth.security.UserPrincipal;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 /** Where the logged-in user is logged in. */
 @RestController
 @RequestMapping("/api/v1/users/me/sessions")
 @RequiredArgsConstructor
+@Tag(name = "My sessions", description = "Where the logged-in user is logged in")
 public class SessionController {
     private final SessionService sessions;
 

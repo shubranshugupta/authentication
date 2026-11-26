@@ -4,6 +4,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.authcore.auth.audit.AuditEvent;
+import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.OneTimeTokenService;
@@ -23,6 +25,7 @@ public class UserService {
     private final OneTimeTokenService tokens;
     private final RetryingTransaction transaction;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLog audit;
 
     public UserResponse getProfile(Integer userId) {
         User user = getUser(userId);
@@ -68,6 +71,7 @@ public class UserService {
                 }).orElse(false));
         if (!deleted)
             throw new InvalidCodeException("The code or the password is wrong, or the code has expired.");
+        audit.record(AuditEvent.ACCOUNT_DELETED, userId);
     }
 
     private User getUser(Integer userId) {
