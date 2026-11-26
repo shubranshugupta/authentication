@@ -1,9 +1,11 @@
 package com.authcore.auth.user;
 
 import java.sql.Date;
+import java.time.Instant;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -66,6 +68,14 @@ public class User {
     /** Part of every access token (H6). */
     @Column(name = "token_version", nullable = false)
     private int tokenVersion;
+
+    /** When an admin locked the account; null if it isn't locked. */
+    @Column(name = "locked_at")
+    private @Nullable Instant lockedAt;
+
+    public boolean isLocked() {
+        return lockedAt != null;
+    }
 
     /** Makes every access token issued so far stop working. */
     public void invalidateAccessTokens() {

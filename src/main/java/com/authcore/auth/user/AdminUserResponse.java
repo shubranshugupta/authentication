@@ -10,6 +10,7 @@ public record AdminUserResponse(
         String lastName,
         Role role,
         boolean emailVerified,
+        boolean locked,
         Date createdAt,
         Date updatedAt) {
 
@@ -21,6 +22,7 @@ public record AdminUserResponse(
                 user.getLastName(),
                 user.getRole(),
                 user.isEnabled(),
+                user.isLocked(),
                 user.getCreatedAt(),
                 user.getUpdatedAt());
     }

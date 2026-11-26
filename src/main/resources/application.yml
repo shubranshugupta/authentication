@@ -61,7 +61,7 @@ auth:
     frontend-url: ${FRONTEND_URL}
 
     # Comma-separated emails that get the ADMIN role (at registration, and existing
-    # users at startup). The API never grants ADMIN. Empty by default.
+    # users at startup). They can make other users admins. Empty by default.
     admin-emails: ${AUTH_ADMIN_EMAILS:}
     token:
         secret-key: ${JWT_SECRET_KEY}

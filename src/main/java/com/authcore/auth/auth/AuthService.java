@@ -129,17 +129,17 @@ public class AuthService {
             throw new InvalidCodeException(INVALID_VERIFICATION_LINK);
     }
 
-    /** Sends a password reset code, if there is a verified account with this email. */
+    /** Sends a password reset code, if there is an account with this email that can log in. */
     public void requestPasswordReset(String email) {
         userRepository.findByEmail(EmailAddresses.normalize(email))
-                .filter(User::isEnabled)
+                .filter(AuthService::canResetPassword)
                 .ifPresent(user -> tokens.issue(user.getId(), TokenPurpose.PASSWORD_RESET));
     }
 
     public void resetPassword(String email, String code, String newPassword, String ip) {
         String normalized = EmailAddresses.normalize(email);
         User account = userRepository.findByEmail(normalized)
-                .filter(User::isEnabled)
+                .filter(AuthService::canResetPassword)
                 .orElseThrow(() -> new InvalidCodeException(INVALID_CODE));
 
         boolean reset = transaction.run(() -> tokens
@@ -154,6 +154,10 @@ public class AuthService {
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
         loginThrottle.passwordChanged(normalized, ip);
+    }
+
+    private static boolean canResetPassword(User user) {
+        return user.isEnabled() && !user.isLocked();
     }
 
     private TokenPair tokenPair(SessionTokens session) {

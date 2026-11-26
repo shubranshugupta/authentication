@@ -16,6 +16,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
@@ -31,9 +32,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.InvalidTokenException;
 import com.authcore.auth.security.TokenExpireException;
+import com.authcore.auth.security.WrongPasswordException;
 import com.authcore.auth.session.SessionNotFoundException;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.TokenAlreadyExistsException;
+import com.authcore.auth.user.AdminActionRefusedException;
 import com.authcore.auth.user.UserAlreadyExistsException;
 import com.authcore.auth.user.UserNotFoundException;
 
@@ -66,6 +69,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(DisabledException e) {
         return problem(ErrorCode.ACCOUNT_DISABLED, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(LockedException e) {
+        return problem(ErrorCode.ACCOUNT_LOCKED, "An administrator locked this account.");
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(WrongPasswordException e) {
+        return problem(ErrorCode.WRONG_PASSWORD, e.getMessage());
     }
 
     @ExceptionHandler
@@ -103,6 +116,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(UserNotFoundException e) {
         return problem(ErrorCode.USER_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(AdminActionRefusedException e) {
+        return problem(ErrorCode.ADMIN_ACTION_REFUSED, e.getMessage());
     }
 
     @ExceptionHandler

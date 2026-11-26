@@ -52,7 +52,7 @@ public class AuthConfigProperties {
 
     /**
      * Emails that get the ADMIN role: at registration, and for existing users at
-     * startup. The only way to create an admin; the API never grants the role.
+     * startup. This is how the first admins are created; they can make others admins.
      */
     private List<String> adminEmails = new ArrayList<>();
     @Valid

@@ -15,7 +15,7 @@ public class LoginDetails extends org.springframework.security.core.userdetails.
     private final int tokenVersion;
 
     public LoginDetails(User user) {
-        super(user.getEmail(), user.getPassword(), user.isEnabled(), true, true, true,
+        super(user.getEmail(), user.getPassword(), user.isEnabled(), true, true, !user.isLocked(),
                 List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
         this.id = user.getId();
         this.tokenVersion = user.getTokenVersion();
