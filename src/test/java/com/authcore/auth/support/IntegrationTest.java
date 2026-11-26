@@ -150,17 +150,33 @@ public abstract class IntegrationTest {
         return mvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie));
     }
 
+    /** Refreshes and returns the new cookie. */
+    protected Cookie nextCookie(Cookie refreshCookie) throws Exception {
+        Cookie next = refresh(refreshCookie).andExpect(status().isOk()).andReturn().getResponse().getCookie("refreshToken");
+        if (next == null)
+            fail("refresh did not set a refreshToken cookie");
+        return next;
+    }
+
+    protected ResultActions logout(Cookie refreshCookie) throws Exception {
+        return mvc.perform(post("/api/v1/auth/logout").cookie(refreshCookie));
+    }
+
     protected String accessToken(String email, String password) throws Exception {
-        String body = login(email, password)
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(body, "$.accessToken");
+        return accessToken(login(email, password));
+    }
+
+    /** The access token in the answer to a login or refresh. */
+    protected static String accessToken(ResultActions answer) throws Exception {
+        return JsonPath.read(answer.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.accessToken");
     }
 
     protected Cookie refreshCookie(String email, String password) throws Exception {
-        Cookie cookie = login(email, password)
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getCookie("refreshToken");
+        return refreshCookie(login(email, password));
+    }
+
+    protected static Cookie refreshCookie(ResultActions login) throws Exception {
+        Cookie cookie = login.andExpect(status().isOk()).andReturn().getResponse().getCookie("refreshToken");
         if (cookie == null)
             fail("login did not set a refreshToken cookie");
         return cookie;

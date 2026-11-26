@@ -1,6 +1,7 @@
 package com.authcore.auth.security;
 
 import java.io.IOException;
+import java.time.Instant;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
-import com.authcore.auth.user.UserRepository;
+import com.authcore.auth.session.UserSessionRepository;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,15 +25,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final String BEARER = "Bearer ";
 
     private final JwtService jwtService;
-    private final UserRepository userRepository;
+    private final UserSessionRepository sessionRepository;
     private final HandlerExceptionResolver exceptionResolver;
 
     // An explicit constructor: Lombok's would drop the @Qualifier.
-    public JwtAuthFilter(JwtService jwtService, UserRepository userRepository,
+    public JwtAuthFilter(JwtService jwtService, UserSessionRepository sessionRepository,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
         this.jwtService = jwtService;
-        this.userRepository = userRepository;
+        this.sessionRepository = sessionRepository;
         this.exceptionResolver = exceptionResolver;
+    }
+
+    /**
+     * Public endpoints ignore access tokens: a client whose token has expired must still be
+     * able to refresh it, even if it sends the old one along.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return SecurityConfig.PUBLIC.matches(request);
     }
 
     @Override
@@ -53,7 +63,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private void authenticate(String token, HttpServletRequest request) {
         AccessToken accessToken = jwtService.parse(token);
-        UserPrincipal principal = userRepository.findById(accessToken.userId())
+        UserPrincipal principal = sessionRepository
+                .findUserOfActiveSession(accessToken.sessionId(), accessToken.userId(), Instant.now())
                 // The version was raised since, e.g. by a password reset (H6).
                 .filter(user -> user.getTokenVersion() == accessToken.tokenVersion())
                 .map(UserPrincipal::from)

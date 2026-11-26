@@ -88,8 +88,12 @@ public class AuthConfigProperties {
         private String audience;
         @Positive
         private long jwtExpiration;
+        /** How long a session lasts after it was last used. */
         @Positive
         private long refreshExpiration;
+        /** How long a session lasts at most, however often it's used. */
+        @Positive
+        private long sessionExpiration;
 
         // A check on a boolean, not on the field: the startup error prints the rejected
         // value, and that must not be the key.

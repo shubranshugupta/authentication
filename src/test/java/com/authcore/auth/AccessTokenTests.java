@@ -35,6 +35,7 @@ class AccessTokenTests extends IntegrationTest {
         assertThat(claims.getIssuer()).isEqualTo("authcore");
         assertThat(claims.getAudience()).containsExactly("authcore");
         assertThat(claims.get("ver", Integer.class)).isZero();
+        assertThat(claims.get("sid", Long.class)).isPositive();
         assertThat(claims.getId()).isNotEmpty();
         assertThat(Duration.between(claims.getIssuedAt().toInstant(), claims.getExpiration().toInstant()))
                 .isEqualTo(Duration.ofMinutes(15));
@@ -107,10 +108,31 @@ class AccessTokenTests extends IntegrationTest {
 
         assertInvalid(valid(accessToken).claim("ver", null));
         assertInvalid(valid(accessToken).claim("ver", "zero"));
+        assertInvalid(valid(accessToken).claim("sid", null));
+        assertInvalid(valid(accessToken).claim("sid", "one"));
+        assertInvalid(valid(accessToken).claim("sid", 999999999));
         assertInvalid(valid(accessToken).subject(null));
         assertInvalid(valid(accessToken).subject("999999999"));
         // What tokens contained before H6.
         assertInvalid(valid(accessToken).subject(email));
+    }
+
+    @Test
+    void tokenWithAnotherUsersSession() throws Exception {
+        Object otherSession = claims(registerVerifiedUserAndLogin(uniqueEmail())).get("sid");
+
+        assertInvalid(valid(registerVerifiedUserAndLogin(uniqueEmail())).claim("sid", otherSession));
+    }
+
+    /** Sessions end too, but the version alone is enough. */
+    @Test
+    void tokenWithAnOldVersion() throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        jdbc.update("update users set token_version = 1 where id = ?", user(email).getId());
+
+        assertInvalid(valid(accessToken));
+        getProfile(valid(accessToken).claim("ver", 1).compact()).andExpect(status().isOk());
     }
 
     // ---- revoked tokens ------------------------------------------------------------

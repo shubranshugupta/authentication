@@ -31,7 +31,7 @@ class AuthApplicationTests extends IntegrationTest {
 		List<String> tables = jdbc.queryForList(
 				"select table_name from information_schema.tables where table_schema = database()",
 				String.class);
-		assertThat(tables).contains("users", "refresh_tokens", "one_time_tokens");
+		assertThat(tables).contains("users", "user_sessions", "refresh_tokens", "one_time_tokens");
 		assertThat(tables).doesNotContain("verification_tokens", "password_reset_otp", "delete_account_otp");
 	}
 

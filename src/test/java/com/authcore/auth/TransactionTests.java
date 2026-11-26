@@ -31,7 +31,7 @@ class TransactionTests extends IntegrationTest {
         requestPasswordReset(email).andExpect(status().isOk());
         String otp = passwordResetOtp(email);
 
-        withoutTable("refresh_tokens", () -> confirmPasswordReset(email, otp, NEW_PASSWORD).andExpect(status().isInternalServerError()));
+        withoutTable("user_sessions", () -> confirmPasswordReset(email, otp, NEW_PASSWORD).andExpect(status().isInternalServerError()));
 
         login(email, PASSWORD).andExpect(status().isOk());
         confirmPasswordReset(email, otp, NEW_PASSWORD).andExpect(status().isOk());

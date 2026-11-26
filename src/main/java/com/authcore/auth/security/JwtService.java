@@ -24,6 +24,7 @@ public class JwtService {
     public static final String INVALID_TOKEN = "The access token is invalid.";
 
     private static final String VERSION = "ver";
+    private static final String SESSION = "sid";
 
     private final AuthConfigProperties.TokenConfigProperties settings;
     private final SecretKey signingKey;
@@ -50,6 +51,7 @@ public class JwtService {
                 // The id, not the email: an email can belong to another account later.
                 .subject(token.userId().toString())
                 .claim(VERSION, token.tokenVersion())
+                .claim(SESSION, token.sessionId())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(settings.getJwtExpiration())))
                 .signWith(signingKey, Jwts.SIG.HS256)
@@ -67,10 +69,11 @@ public class JwtService {
         try {
             Claims claims = parser.parseSignedClaims(token).getPayload();
             Integer version = claims.get(VERSION, Integer.class);
+            Long session = claims.get(SESSION, Long.class);
             // The parser accepts a token without an expiry; this server never issues one.
-            if (claims.getSubject() == null || claims.getExpiration() == null || version == null)
+            if (claims.getSubject() == null || claims.getExpiration() == null || version == null || session == null)
                 throw new InvalidTokenException(INVALID_TOKEN);
-            return new AccessToken(Integer.valueOf(claims.getSubject()), version);
+            return new AccessToken(Integer.valueOf(claims.getSubject()), version, session);
         } catch (ExpiredJwtException e) {
             throw new TokenExpireException("The access token has expired.", e);
         } catch (JwtException | IllegalArgumentException e) { // includes a subject that isn't a number

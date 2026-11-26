@@ -32,7 +32,7 @@ class ConcurrentRequestTests extends IntegrationTest {
     private static final int DEADLOCK_ROUNDS = 25;
 
     @Test
-    void firstLoginsAllSucceedAndShareOneRefreshToken() throws Exception {
+    void firstLoginsAllSucceedAndHaveTheirOwnSessions() throws Exception {
         for (int round = 0; round < ROUNDS; round++) {
             String email = uniqueEmail();
             register(email, PASSWORD);
@@ -49,7 +49,7 @@ class ConcurrentRequestTests extends IntegrationTest {
 
             assertThat(statuses).containsOnly(200);
             assertThat(refreshTokens).hasSize(REQUESTS);
-            assertThat(refreshTokens.stream().distinct()).hasSize(1);
+            assertThat(refreshTokens).doesNotHaveDuplicates();
         }
     }
 
@@ -160,13 +160,13 @@ class ConcurrentRequestTests extends IntegrationTest {
         }
     }
 
-    /** The same for a login whose old refresh token has expired: it's deleted and replaced. */
+    /** The same for logins that clean up an expired session. */
     @Test
-    void loginsThatReplaceAnExpiredRefreshTokenAllSucceed() throws Exception {
+    void loginsAfterASessionExpiredAllSucceed() throws Exception {
         for (int round = 0; round < ROUNDS; round++) {
             String email = uniqueEmail();
             registerVerifiedUserAndLogin(email);
-            jdbc.update("update refresh_tokens set expiry_date = '2020-01-01' where user_id = ?", user(email).getId());
+            jdbc.update("update user_sessions set expires_at = '2020-01-01' where user_id = ?", user(email).getId());
 
             assertThat(allAtOnce(() -> login(email, PASSWORD).andReturn().getResponse().getStatus()))
                     .containsOnly(200);
@@ -184,6 +184,81 @@ class ConcurrentRequestTests extends IntegrationTest {
             assertThat(statuses).containsOnly(200, 409);
             assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
             assertSentOnce(email, "Delete Account");
+        }
+    }
+
+    /** C2: tabs that refresh at the same moment all stay logged in, with one new token. */
+    @Test
+    void parallelRefreshesAllSucceedAndOneGetsTheNewToken() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            String email = uniqueEmail();
+            registerVerifiedUserAndLogin(email);
+            Cookie cookie = refreshCookie(email, PASSWORD);
+            Queue<Cookie> next = new ConcurrentLinkedQueue<>();
+
+            List<Integer> statuses = allAtOnce(() -> {
+                var response = refresh(cookie).andReturn().getResponse();
+                Cookie newCookie = response.getCookie("refreshToken");
+                if (newCookie != null)
+                    next.add(newCookie);
+                return response.getStatus();
+            });
+
+            assertThat(statuses).containsOnly(200);
+            assertThat(next).hasSize(1);
+            refresh(next.remove()).andExpect(status().isOk());
+        }
+    }
+
+    /** However a logout and refreshes overlap, the session is over afterwards. */
+    @Test
+    void nothingSurvivesALogout() throws Exception {
+        for (int round = 0; round < DEADLOCK_ROUNDS; round++) {
+            String email = uniqueEmail();
+            registerVerifiedUserAndLogin(email);
+            Cookie cookie = refreshCookie(email, PASSWORD);
+            Queue<Cookie> next = new ConcurrentLinkedQueue<>();
+            AtomicBoolean first = new AtomicBoolean(true);
+
+            List<Integer> statuses = allAtOnce(() -> {
+                if (first.getAndSet(false))
+                    return logout(cookie).andReturn().getResponse().getStatus();
+                var response = refresh(cookie).andReturn().getResponse();
+                Cookie newCookie = response.getCookie("refreshToken");
+                if (newCookie != null)
+                    next.add(newCookie);
+                return response.getStatus();
+            });
+
+            assertThat(statuses).isSubsetOf(200, 401);
+            for (Cookie survivor : next)
+                refresh(survivor).andExpect(status().isUnauthorized());
+        }
+    }
+
+    /** A login with the old password must not end up with a session after the reset. */
+    @Test
+    void noLoginWithTheOldPasswordSurvivesAReset() throws Exception {
+        for (int round = 0; round < DEADLOCK_ROUNDS; round++) {
+            String email = uniqueEmail();
+            registerVerifiedUserAndLogin(email);
+            requestPasswordReset(email);
+            String otp = passwordResetOtp(email);
+            AtomicBoolean first = new AtomicBoolean(true);
+            Queue<String> accessTokens = new ConcurrentLinkedQueue<>();
+
+            List<Integer> statuses = allAtOnce(() -> {
+                if (first.getAndSet(false))
+                    return confirmPasswordReset(email, otp);
+                var login = login(email, PASSWORD);
+                if (login.andReturn().getResponse().getStatus() == 200)
+                    accessTokens.add(accessToken(login));
+                return login.andReturn().getResponse().getStatus();
+            });
+
+            assertThat(statuses).isSubsetOf(200, 401);
+            for (String accessToken : accessTokens)
+                getProfile(accessToken).andExpect(status().isUnauthorized());
         }
     }
 

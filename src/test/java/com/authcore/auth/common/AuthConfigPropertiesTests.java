@@ -84,8 +84,9 @@ class AuthConfigPropertiesTests {
         TokenConfigProperties token = token(base64(32));
         token.setJwtExpiration(0);
         token.setRefreshExpiration(-1);
+        token.setSessionExpiration(0);
 
-        assertThat(VALIDATOR.validate(token)).hasSize(2);
+        assertThat(VALIDATOR.validate(token)).hasSize(3);
     }
 
     @Test
@@ -130,6 +131,7 @@ class AuthConfigPropertiesTests {
         token.setAudience("authcore");
         token.setJwtExpiration(1);
         token.setRefreshExpiration(1);
+        token.setSessionExpiration(1);
         return token;
     }
 

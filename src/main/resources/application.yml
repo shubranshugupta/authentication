@@ -34,7 +34,7 @@ spring:
     data:
         redis:
             # Fail after 2 seconds when Redis doesn't answer. The default is a full minute,
-            # and every request that uses the cache would hang that long.
+            # and every request that uses Redis would hang that long.
             connect-timeout: 2s
             timeout: 2s
 
@@ -67,7 +67,9 @@ auth:
         audience: ${JWT_AUDIENCE:authcore}
         # 15 minutes. Short, because a stolen access token works until it expires.
         jwt-expiration: 900000
+        # A session ends 7 days after it was last used, and 30 days after the login at the latest.
         refresh-expiration: 604800000
+        session-expiration: 2592000000
 
     # The refresh-token cookie. Keep the defaults while the frontend runs on the same
     # site as the API (e.g. localhost:3000 -> localhost:8080). For a frontend on another

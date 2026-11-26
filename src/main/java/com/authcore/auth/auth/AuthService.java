@@ -12,7 +12,10 @@ import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.security.JwtService;
-import com.authcore.auth.session.RefreshTokenService;
+import com.authcore.auth.security.LoginDetails;
+import com.authcore.auth.session.ClientInfo;
+import com.authcore.auth.session.SessionService;
+import com.authcore.auth.session.SessionTokens;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.OneTimeTokenService;
 import com.authcore.auth.token.TokenPurpose;
@@ -35,7 +38,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RefreshTokenService refreshTokenService;
+    private final SessionService sessions;
     private final AuthenticationManager manager;
     private final OneTimeTokenService tokens;
     private final RetryingTransaction transaction;
@@ -70,25 +73,24 @@ public class AuthService {
         }
     }
 
-    public TokenPair login(String email, String password) {
-        String normalized = EmailAddresses.normalize(email);
+    public TokenPair login(String email, String password, ClientInfo client) {
+        // H2: an unknown email fails exactly like a wrong password (401), instead of
+        // revealing that it isn't registered.
+        LoginDetails user = (LoginDetails) manager.authenticate(
+                new UsernamePasswordAuthenticationToken(EmailAddresses.normalize(email), password)).getPrincipal();
 
-        // H2: check the password first. An unknown email then fails exactly like
-        // a wrong password (401), instead of revealing that it isn't registered.
-        manager.authenticate(new UsernamePasswordAuthenticationToken(normalized, password));
-
-        // Only missing if the account was deleted a moment ago.
-        User user = userRepository.findByEmail(normalized)
+        return sessions.open(user.getId(), user.getTokenVersion(), client)
+                .map(this::tokenPair)
+                // The account was deleted, or its password changed, a moment ago.
                 .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
-
-        return new TokenPair(
-                accessToken(user),
-                refreshTokenService.createRefreshToken(user).getRefreshToken());
     }
 
-    /** Returns a new access token. */
-    public String refresh(String refreshToken) {
-        return accessToken(refreshTokenService.verifyRefreshToken(refreshToken));
+    public TokenPair refresh(String refreshToken, ClientInfo client) {
+        return tokenPair(sessions.refresh(refreshToken, client));
+    }
+
+    public void logout(String refreshToken) {
+        sessions.close(refreshToken);
     }
 
     /** Sends the verification email again, if there is an account that needs it. */
@@ -125,17 +127,18 @@ public class AuthService {
                 .consumeCode(account.getId(), code, TokenPurpose.PASSWORD_RESET, user -> true)
                 .map(user -> {
                     user.setPassword(passwordEncoder.encode(newPassword));
-                    // Whoever knew the old password may hold tokens.
-                    user.invalidateAccessTokens();
                     userRepository.save(user);
-                    refreshTokenService.deleteRefreshToken(user);
+                    // Whoever knew the old password may be logged in.
+                    sessions.endAll(user);
                     return true;
                 }).orElse(false));
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
     }
 
-    private String accessToken(User user) {
-        return jwtService.generateToken(new AccessToken(user.getId(), user.getTokenVersion()));
+    private TokenPair tokenPair(SessionTokens session) {
+        String accessToken = jwtService.generateToken(
+                new AccessToken(session.userId(), session.tokenVersion(), session.sessionId()));
+        return new TokenPair(accessToken, session.refreshToken(), session.validFor());
     }
 }

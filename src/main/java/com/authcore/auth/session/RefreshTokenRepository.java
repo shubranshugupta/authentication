@@ -3,11 +3,12 @@ package com.authcore.auth.session;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
-import com.authcore.auth.user.User;
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Integer> {
-    Optional<RefreshToken> findByRefreshToken(String token);
-
-    Optional<RefreshToken> findByUser(User user);
+    /** Only the id: the token itself must be read after its user was locked. */
+    @Query("select s.userId from RefreshToken t join UserSession s on s.id = t.sessionId where t.tokenHash = :tokenHash")
+    Optional<Integer> findUserId(String tokenHash);
 }

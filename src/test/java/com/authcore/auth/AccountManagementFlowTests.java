@@ -157,8 +157,7 @@ class AccountManagementFlowTests extends IntegrationTest {
         String email = uniqueEmail();
         String accessToken = registerVerifiedUserAndLogin(email);
         Cookie refreshCookie = refreshCookie(email, PASSWORD);
-        // Puts the refresh token in the Redis cache, where it used to outlive the account.
-        refresh(refreshCookie).andExpect(status().isOk());
+        refreshCookie = nextCookie(refreshCookie);
 
         requestAccountDeletion(accessToken).andExpect(status().isOk());
         confirmAccountDeletion(accessToken, deleteAccountOtp(email), PASSWORD).andExpect(status().isOk());

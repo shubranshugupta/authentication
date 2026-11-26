@@ -12,7 +12,6 @@ import org.springframework.http.HttpHeaders;
 
 import com.authcore.auth.support.IntegrationTest;
 import com.authcore.auth.user.User;
-import com.jayway.jsonpath.JsonPath;
 
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
@@ -162,19 +161,10 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
     void refreshReturnsAWorkingAccessToken() throws Exception {
         String email = uniqueEmail();
         registerVerifiedUserAndLogin(email);
-        Cookie refreshCookie = refreshCookie(email, PASSWORD);
 
-        // Twice: the first call reads the token from MySQL, the second from the Redis cache.
-        for (int i = 0; i < 2; i++) {
-            String body = refresh(refreshCookie)
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                    .andReturn().getResponse().getContentAsString();
-
-            getProfile(JsonPath.read(body, "$.accessToken"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.email").value(email));
-        }
+        getProfile(accessToken(refresh(refreshCookie(email, PASSWORD))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email));
     }
 
     @Test
