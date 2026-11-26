@@ -45,6 +45,13 @@ logging:
         format:
             console: ecs
 
+springdoc:
+    # The API description and Swagger UI map out the whole API: off unless API_DOCS_ENABLED=true.
+    api-docs:
+        enabled: ${API_DOCS_ENABLED:false}
+    swagger-ui:
+        enabled: ${API_DOCS_ENABLED:false}
+
 auth:
     # Checked before anything starts (RequiredSettings). Every variable above that has no
     # default belongs here.

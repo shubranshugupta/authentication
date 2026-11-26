@@ -33,6 +33,9 @@ public class SecurityConfig {
     /** Everything else needs a login. */
     static final RequestMatcher PUBLIC = PathPatternRequestMatcher.pathPattern("/api/v1/auth/**");
 
+    /** The API description and Swagger UI (F3); prod turns them off by default. */
+    private static final String[] API_DOCS = { "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html" };
+
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
     private final AuthConfigProperties authConfigProperties;
@@ -64,6 +67,8 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC)
                         .permitAll()
                         .requestMatchers(EndpointRequest.toAnyEndpoint())
+                        .permitAll()
+                        .requestMatchers(API_DOCS)
                         .permitAll()
                         .anyRequest()
                         .authenticated())

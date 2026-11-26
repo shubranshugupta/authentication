@@ -18,6 +18,8 @@ import com.authcore.auth.ratelimit.RateLimit;
 import com.authcore.auth.ratelimit.RateLimiter;
 import com.authcore.auth.session.ClientInfo;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping(AuthController.PATH)
 @RequiredArgsConstructor
+@Tag(name = "Auth", description = "Registration, login, refresh, logout, email verification and password reset")
+@SecurityRequirements // no access token needed
 public class AuthController {
     // Also the path of the refresh cookie: browsers only send it to paths under this one.
     static final String PATH = "/api/v1/auth";
