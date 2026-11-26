@@ -75,6 +75,12 @@ auth:
         refresh-expiration: 604800000
         session-expiration: 2592000000
 
+    # Deletes expired sessions, used refresh tokens older than the refresh expiration, and
+    # expired codes (M5). Hourly at minute 7; Spring's cron format is "second minute hour
+    # day month weekday", and "-" turns the job off.
+    cleanup:
+        cron: ${CLEANUP_CRON:0 7 * * * *}
+
     # The refresh-token cookie. Keep the defaults while the frontend runs on the same
     # site as the API (e.g. localhost:3000 -> localhost:8080). For a frontend on another
     # domain, set AUTH_COOKIE_SAME_SITE=None (needs AUTH_COOKIE_SECURE=true and HTTPS).

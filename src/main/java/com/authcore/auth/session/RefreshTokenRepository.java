@@ -1,8 +1,13 @@
 package com.authcore.auth.session;
 
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
@@ -11,4 +16,15 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     /** Only the id: the token itself must be read after its user was locked. */
     @Query("select s.userId from RefreshToken t join UserSession s on s.id = t.sessionId where t.tokenHash = :tokenHash")
     Optional<Integer> findUserId(String tokenHash);
+
+    // ---- cleanup (SessionCleanup) ----
+
+    @Query("select distinct s.userId from RefreshToken t join UserSession s on s.id = t.sessionId where t.usedAt < :before")
+    List<Integer> findUsersWithTokensUsedBefore(Instant before, Pageable page);
+
+    @Modifying
+    @Query("""
+            delete from RefreshToken t
+            where t.usedAt < :before and t.sessionId in (select s.id from UserSession s where s.userId in :userIds)""")
+    int deleteUsedBefore(Collection<Integer> userIds, Instant before);
 }
