@@ -6,6 +6,10 @@
 #
 # MySQL is published on 3307 by default, so it doesn't clash with a MySQL server
 # already installed on 3306. Ports are bound to 127.0.0.1 only.
+#
+# The app itself can run here too, built from the Dockerfile (stop the one in your IDE
+# first, it uses the same ports):
+#   docker compose --env-file env.properties --profile app up -d --build
 services:
   mysql:
     image: mysql:8.4
@@ -44,6 +48,34 @@ services:
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1        # accept any username/password (the app logs in to SMTP)
       MP_SMTP_AUTH_ALLOW_INSECURE: 1    # allow that login without TLS (local only)
+
+  # The app from the Dockerfile; only with --profile app (see above).
+  app:
+    build: .
+    profiles: ["app"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      # dev, not the image's prod: Mailpit has no TLS, which prod requires.
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-auth}
+      DB_USER: ${DB_USER:-auth}
+      DB_PASSWORD: ${DB_PASSWORD:-auth}
+      REDIS_HOST: redis
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in env.properties}
+      AUTH_ADMIN_EMAILS: ${AUTH_ADMIN_EMAILS:-}
+    ports:
+      - "127.0.0.1:8080:8080"   # the API
+      - "127.0.0.1:8081:8081"   # health checks and metrics
 
 volumes:
   mysql-data:

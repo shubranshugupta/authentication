@@ -1,0 +1,5 @@
+# Shell scripts run on Linux (CI, the Docker build): never with Windows line endings.
+mvnw text eol=lf
+*.sh text eol=lf
+# And Windows scripts with Windows ones.
+*.cmd text eol=crlf
