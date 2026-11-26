@@ -1,0 +1,5 @@
+org.springframework.boot.EnvironmentPostProcessor=\
+com.authcore.auth.common.RequiredSettings
+
+org.springframework.boot.diagnostics.FailureAnalyzer=\
+com.authcore.auth.common.MissingSettingsFailureAnalyzer

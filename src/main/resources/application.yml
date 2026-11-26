@@ -19,6 +19,15 @@ spring:
             # transaction keeps seeing what was there at its first read, even after waiting
             # for a lock: one verification link could then be used twice at the same moment.
             transaction-isolation: TRANSACTION_READ_COMMITTED
+            # Connections per server. All servers together must stay below MySQL's
+            # max_connections (151 by default).
+            maximum-pool-size: ${DB_POOL_SIZE:10}
+            # A request waits at most 5 seconds for a free connection, then fails, instead of
+            # hanging for the default 30 seconds.
+            connection-timeout: 5000
+            # Idle connections are used every 5 minutes, so that a firewall or proxy between
+            # here and the database doesn't drop them unnoticed.
+            keepalive-time: 300000
 
     jpa:
         hibernate:
