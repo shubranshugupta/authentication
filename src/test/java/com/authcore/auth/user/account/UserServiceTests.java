@@ -1,4 +1,4 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.account;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,6 +23,9 @@ import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.OneTimeTokenService;
 import com.authcore.auth.token.TokenAlreadyExistsException;
 import com.authcore.auth.token.TokenPurpose;
+import com.authcore.auth.user.Role;
+import com.authcore.auth.user.User;
+import com.authcore.auth.user.UserRepository;
 
 /** A5: the service takes a user id instead of a raw "Bearer ..." header. */
 @ExtendWith(MockitoExtension.class)

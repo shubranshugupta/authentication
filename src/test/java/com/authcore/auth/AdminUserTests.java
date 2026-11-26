@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import com.authcore.auth.security.UserPrincipal;
 import com.authcore.auth.support.IntegrationTest;
-import com.authcore.auth.user.AdminBootstrap;
+import com.authcore.auth.user.admin.AdminBootstrap;
 import com.authcore.auth.user.Role;
 
 /** H7: role names Spring can check, and the read-only admin API. */

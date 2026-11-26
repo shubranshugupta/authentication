@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import com.authcore.auth.support.IntegrationTest;
-import com.authcore.auth.user.AdminBootstrap;
+import com.authcore.auth.user.admin.AdminBootstrap;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;

@@ -36,7 +36,7 @@ import com.authcore.auth.security.WrongPasswordException;
 import com.authcore.auth.session.SessionNotFoundException;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.TokenAlreadyExistsException;
-import com.authcore.auth.user.AdminActionRefusedException;
+import com.authcore.auth.user.admin.AdminActionRefusedException;
 import com.authcore.auth.user.UserAlreadyExistsException;
 import com.authcore.auth.user.UserNotFoundException;
 

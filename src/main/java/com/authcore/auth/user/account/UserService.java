@@ -1,4 +1,4 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.account;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -9,6 +9,9 @@ import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.OneTimeTokenService;
 import com.authcore.auth.token.TokenAlreadyExistsException;
 import com.authcore.auth.token.TokenPurpose;
+import com.authcore.auth.user.User;
+import com.authcore.auth.user.UserNotFoundException;
+import com.authcore.auth.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 

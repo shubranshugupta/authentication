@@ -93,7 +93,9 @@ Packages under `com.authcore.auth` are grouped by feature:
 | Package | What's in it |
 |---|---|
 | `auth` | registration, login, email verification, password reset |
-| `user` | users, profile, account deletion, admin API |
+| `user` | the user entity, roles, and the user repository |
+| `user.account` | a user's own account: profile, account deletion (`/api/v1/users/me`) |
+| `user.admin` | the admin API (`/api/v1/admin/users`), and the first admins from `AUTH_ADMIN_EMAILS` |
 | `token` | the codes and links sent by email |
 | `session` | sessions and refresh tokens, logout |
 | `security` | Spring Security setup, access tokens (JWT) |

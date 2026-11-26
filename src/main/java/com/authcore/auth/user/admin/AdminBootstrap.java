@@ -1,4 +1,4 @@
-package com.authcore.auth.user;
+package com.authcore.auth.user.admin;
 
 import java.util.Collection;
 
@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.user.Role;
+import com.authcore.auth.user.User;
+import com.authcore.auth.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
