@@ -1,66 +1,51 @@
 package com.authcore.auth.session;
 
-import java.sql.Date;
 import java.time.Instant;
 
-import org.hibernate.annotations.CreationTimestamp;
-
-import com.authcore.auth.user.User;
+import org.jspecify.annotations.Nullable;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
 
-@Getter
-@Setter
-@ToString
+/**
+ * A refresh token of a session, of which only a hash is stored. Each can be used once. It
+ * has no expiry of its own: it lasts as long as its session.
+ */
 @Entity
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @Table(name = "refresh_tokens")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefreshToken {
     @Id
-    @GeneratedValue
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @ToString.Exclude
-    @Column(name = "token", nullable = false, length = 1000)
-    private String refreshToken;
+    @Column(name = "session_id", nullable = false, updatable = false)
+    private Long sessionId;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false, nullable = false)
-    private Date createdAt;
+    @Column(name = "token_hash", nullable = false, updatable = false, length = 64)
+    private String tokenHash;
 
-    @Column(name = "expiry_date", nullable = false)
-    private Instant expiryDate;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
-    @ToString.Exclude
-    @OneToOne
-    private User user;
+    @Column(name = "used_at")
+    private @Nullable Instant usedAt;
 
-    // JPA entities compare by database id only. getId() (not the field) works on Hibernate
-    // proxies; the constant hashCode stays stable when a new entity gets its id.
-    @Override
-    public boolean equals(Object other) {
-        if (this == other)
-            return true;
-        if (!(other instanceof RefreshToken that))
-            return false;
-        return getId() != null && getId().equals(that.getId());
+    RefreshToken(Long sessionId, String tokenHash, Instant now) {
+        this.sessionId = sessionId;
+        this.tokenHash = tokenHash;
+        this.createdAt = now;
     }
 
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
+    void use(Instant now) {
+        usedAt = now;
     }
 }

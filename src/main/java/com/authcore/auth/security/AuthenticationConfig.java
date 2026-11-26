@@ -7,8 +7,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -46,13 +44,9 @@ public class AuthenticationConfig {
      * What the password check needs, for that check only. Not a UserDetailsService bean:
      * after login, requests are authenticated by JwtAuthFilter (with a UserPrincipal).
      */
-    private UserDetails loginDetails(String email) {
+    private LoginDetails loginDetails(String email) {
         return userRepository.findByEmail(email)
-                .map(user -> User.withUsername(user.getEmail())
-                        .password(user.getPassword())
-                        .roles(user.getRole().name())
-                        .disabled(!user.isEnabled())
-                        .build())
+                .map(LoginDetails::new)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 

@@ -7,6 +7,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
@@ -27,10 +29,14 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.InvalidTokenException;
 import com.authcore.auth.security.TokenExpireException;
+import com.authcore.auth.security.WrongPasswordException;
+import com.authcore.auth.session.SessionNotFoundException;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.TokenAlreadyExistsException;
+import com.authcore.auth.user.AdminActionRefusedException;
 import com.authcore.auth.user.UserAlreadyExistsException;
 import com.authcore.auth.user.UserNotFoundException;
 
@@ -66,6 +72,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler
+    ProblemDetail handle(LockedException e) {
+        return problem(ErrorCode.ACCOUNT_LOCKED, "An administrator locked this account.");
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(WrongPasswordException e) {
+        return problem(ErrorCode.WRONG_PASSWORD, e.getMessage());
+    }
+
+    @ExceptionHandler
     ProblemDetail handle(AccessDeniedException e) {
         return problem(ErrorCode.ACCESS_DENIED, e.getMessage());
     }
@@ -90,7 +106,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ErrorCode.TOKEN_ALREADY_EXISTS, e.getMessage());
     }
 
-    // ---- users ---------------------------------------------------------------------
+    // ---- users and sessions ---------------------------------------------------------------------
 
     @ExceptionHandler
     ProblemDetail handle(UserAlreadyExistsException e) {
@@ -100,6 +116,25 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(UserNotFoundException e) {
         return problem(ErrorCode.USER_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(AdminActionRefusedException e) {
+        return problem(ErrorCode.ADMIN_ACTION_REFUSED, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(SessionNotFoundException e) {
+        return problem(ErrorCode.SESSION_NOT_FOUND, e.getMessage());
+    }
+
+    // ---- rate limits ---------------------------------------------------------------
+
+    @ExceptionHandler
+    ResponseEntity<ProblemDetail> handle(TooManyRequestsException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .body(problem(ErrorCode.TOO_MANY_REQUESTS, e.getMessage()));
     }
 
     // ---- everything else -----------------------------------------------------------

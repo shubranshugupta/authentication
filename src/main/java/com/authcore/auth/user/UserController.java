@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.authcore.auth.common.MsgResponse;
+import com.authcore.auth.ratelimit.RateLimit;
+import com.authcore.auth.ratelimit.RateLimiter;
 import com.authcore.auth.security.UserPrincipal;
 
 import jakarta.validation.Valid;
@@ -20,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final RateLimiter rateLimiter;
 
     @GetMapping
     public ResponseEntity<UserResponse> getUserInfo(@AuthenticationPrincipal UserPrincipal me) {
@@ -35,6 +38,7 @@ public class UserController {
 
     @PostMapping("/deletion")
     public ResponseEntity<MsgResponse> requestDeletion(@AuthenticationPrincipal UserPrincipal me) {
+        rateLimiter.acquire(RateLimit.DELETION_EMAIL_PER_USER.forUser(me.id()));
         userService.requestDeletion(me.id());
         return message("Delete account email sent.");
     }

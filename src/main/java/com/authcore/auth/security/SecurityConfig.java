@@ -1,7 +1,10 @@
 package com.authcore.auth.security;
 
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -10,6 +13,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -23,6 +28,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @EnableMethodSecurity
 public class SecurityConfig {
+    /** Everything else needs a login. */
+    static final RequestMatcher PUBLIC = PathPatternRequestMatcher.pathPattern("/api/v1/auth/**");
+
     private final JwtAuthFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
     private final AuthConfigProperties authConfigProperties;
@@ -37,7 +45,7 @@ public class SecurityConfig {
                 // rejected as unauthenticated.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers("/api/v1/auth/**")
+                        .requestMatchers(PUBLIC)
                         .permitAll()
                         .anyRequest()
                         .authenticated())
@@ -57,6 +65,8 @@ public class SecurityConfig {
         config.setAllowedOrigins(authConfigProperties.getCors().getAllowedOrigins());
         config.setAllowedMethods(authConfigProperties.getCors().getAllowedMethods());
         config.setAllowedHeaders(authConfigProperties.getCors().getAllowedHeaders());
+        // Scripts can't read it otherwise.
+        config.setExposedHeaders(List.of(HttpHeaders.RETRY_AFTER));
         // Lets the frontend send and receive the refresh-token cookie
         // (fetch with credentials: "include"). Requires exact origins, never "*".
         config.setAllowCredentials(true);

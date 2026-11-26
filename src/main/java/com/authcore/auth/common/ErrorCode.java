@@ -26,15 +26,22 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid Token"),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "Token has expired"),
     ACCOUNT_DISABLED(HttpStatus.FORBIDDEN, "Account is disabled. Please Verify your Account"),
+    ACCOUNT_LOCKED(HttpStatus.FORBIDDEN, "Account is locked"),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "User is not authorized to access this resource"),
     TOKEN_ALREADY_EXISTS(HttpStatus.CONFLICT, "Token already exists"),
+    // 403, not 401: the access token is fine, so a client must not refresh it or log out
+    WRONG_PASSWORD(HttpStatus.FORBIDDEN, "Wrong password"),
 
     // codes and links from emails (400, not 401: the login is fine, so a client must not refresh it)
     INVALID_CODE(HttpStatus.BAD_REQUEST, "Invalid or expired code"),
 
-    // users
+    // users and sessions
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "User already exists"),
+    ADMIN_ACTION_REFUSED(HttpStatus.CONFLICT, "This can't be done to this user"),
+    SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "Session not found"),
+
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "Too many requests"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
 

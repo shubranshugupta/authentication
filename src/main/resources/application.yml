@@ -34,7 +34,7 @@ spring:
     data:
         redis:
             # Fail after 2 seconds when Redis doesn't answer. The default is a full minute,
-            # and every request that uses the cache would hang that long.
+            # and a request that needs a rate limit would hang that long.
             connect-timeout: 2s
             timeout: 2s
 
@@ -50,6 +50,10 @@ spring:
 
 server:
     port: ${SERVER_PORT:8080}
+    # Behind a reverse proxy, set FORWARD_HEADERS_STRATEGY=native: otherwise every request
+    # seems to come from the proxy, and all users share the rate limits per IP address.
+    # Without a proxy keep "none", or clients could choose their address themselves.
+    forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
 auth:
     # Where the web app runs. Verification emails link to its /verify-email?token=... page,
@@ -57,12 +61,19 @@ auth:
     frontend-url: ${FRONTEND_URL}
 
     # Comma-separated emails that get the ADMIN role (at registration, and existing
-    # users at startup). The API never grants ADMIN. Empty by default.
+    # users at startup). They can make other users admins. Empty by default.
     admin-emails: ${AUTH_ADMIN_EMAILS:}
     token:
         secret-key: ${JWT_SECRET_KEY}
-        jwt-expiration: 10800000
+        # Every access token names its issuer and audience, and is refused if they differ.
+        # Give each environment its own, so that their tokens can't be mixed up.
+        issuer: ${JWT_ISSUER:authcore}
+        audience: ${JWT_AUDIENCE:authcore}
+        # 15 minutes. Short, because a stolen access token works until it expires.
+        jwt-expiration: 900000
+        # A session ends 7 days after it was last used, and 30 days after the login at the latest.
         refresh-expiration: 604800000
+        session-expiration: 2592000000
 
     # The refresh-token cookie. Keep the defaults while the frontend runs on the same
     # site as the API (e.g. localhost:3000 -> localhost:8080). For a frontend on another

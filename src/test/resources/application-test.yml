@@ -3,8 +3,8 @@
 # settings are needed here, and nothing is read from ./env.properties.
 auth:
     frontend-url: https://app.authcore.test/
-    # Registers as ADMIN (AdminUserTests uses it once).
-    admin-emails: first-admin@authcore.test
+    # Register as ADMIN (AdminUserTests and AdminActionTests use one each).
+    admin-emails: first-admin@authcore.test, second-admin@authcore.test
     token:
         # Test-only key (base64 of "test-only-jwt-signing-key-for-authcore-integration-tests").
         secret-key: dGVzdC1vbmx5LWp3dC1zaWduaW5nLWtleS1mb3ItYXV0aGNvcmUtaW50ZWdyYXRpb24tdGVzdHM=

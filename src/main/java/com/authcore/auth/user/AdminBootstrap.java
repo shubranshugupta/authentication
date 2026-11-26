@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
+import com.authcore.auth.common.RetryingTransaction;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AdminBootstrap {
     private final AuthConfigProperties authConfigProperties;
     private final UserRepository userRepository;
+    private final RetryingTransaction transaction;
 
     @EventListener(ApplicationReadyEvent.class)
     public void promoteConfiguredAdmins() {
@@ -34,15 +36,18 @@ public class AdminBootstrap {
         for (String email : emails) {
             if (email == null || email.isBlank())
                 continue;
-            userRepository.findByEmail(EmailAddresses.normalize(email)).ifPresent(this::promote);
+            userRepository.findByEmail(EmailAddresses.normalize(email))
+                    .filter(user -> user.getRole() != Role.ADMIN)
+                    .ifPresent(this::promote);
         }
     }
 
     private void promote(User user) {
-        if (user.getRole() == Role.ADMIN)
-            return;
-        user.setRole(Role.ADMIN);
-        userRepository.save(user);
+        // Locked for the same reason as in UserService.updateProfile.
+        transaction.run(() -> userRepository.findAndLockById(user.getId()).map(locked -> {
+            locked.setRole(Role.ADMIN);
+            return userRepository.save(locked);
+        }));
         log.info("Gave the ADMIN role to user {} (listed in auth.admin-emails)", user.getId());
     }
 }

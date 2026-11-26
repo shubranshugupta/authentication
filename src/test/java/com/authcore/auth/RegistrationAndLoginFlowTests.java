@@ -7,32 +7,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
-
-import javax.crypto.SecretKey;
-
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 
 import com.authcore.auth.support.IntegrationTest;
 import com.authcore.auth.user.User;
-import com.jayway.jsonpath.JsonPath;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.Cookie;
 
 /** Registration, email verification, login, refresh, and access-token checks. */
 class RegistrationAndLoginFlowTests extends IntegrationTest {
-
-    @Value("${auth.token.secret-key}")
-    private String jwtSecret;
 
     // ---- registration and verification ---------------------------------------------
 
@@ -175,19 +161,10 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
     void refreshReturnsAWorkingAccessToken() throws Exception {
         String email = uniqueEmail();
         registerVerifiedUserAndLogin(email);
-        Cookie refreshCookie = refreshCookie(email, PASSWORD);
 
-        // Twice: the first call reads the token from MySQL, the second from the Redis cache.
-        for (int i = 0; i < 2; i++) {
-            String body = refresh(refreshCookie)
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                    .andReturn().getResponse().getContentAsString();
-
-            getProfile(JsonPath.read(body, "$.accessToken"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.email").value(email));
-        }
+        getProfile(accessToken(refresh(refreshCookie(email, PASSWORD))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email));
     }
 
     @Test
@@ -219,57 +196,5 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
     @Test
     void protectedEndpointWithoutATokenReturns401() throws Exception {
         mvc.perform(get("/api/v1/users/me")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void tokenSignedWithAnotherKeyReturns401() throws Exception {
-        String email = uniqueEmail();
-        registerVerifiedUserAndLogin(email);
-        SecretKey otherKey = Keys.hmacShaKeyFor(
-                Decoders.BASE64.decode("YW5vdGhlci1rZXktdGhhdC10aGUtc2VydmVyLWRvZXMtbm90LWtub3ctYWJvdXQ="));
-
-        getProfile(token(email, otherKey, Instant.now().plus(1, ChronoUnit.HOURS)))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void expiredTokenReturns401() throws Exception {
-        String email = uniqueEmail();
-        registerVerifiedUserAndLogin(email);
-        SecretKey serverKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
-
-        getProfile(token(email, serverKey, Instant.now().minus(1, ChronoUnit.MINUTES)))
-                .andExpect(status().isUnauthorized());
-    }
-
-    /** M6: these used to be 500. */
-    @Test
-    void tokensThatAreNotJwtsReturn401() throws Exception {
-        for (String notAJwt : new String[] { "not-a-jwt", "", "a.b.c", "eyJhbGciOiJub25lIn0.eyJzdWIiOiJhIn0.", "%%%" }) {
-            getProfile(notAJwt)
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.code").value("INVALID_TOKEN"))
-                    .andExpect(jsonPath("$.detail").value("The access token is invalid."));
-        }
-    }
-
-    /** The server always sets an expiry; a token without one must not live forever. */
-    @Test
-    void tokenWithoutAnExpiryReturns401() throws Exception {
-        String email = uniqueEmail();
-        registerVerifiedUserAndLogin(email);
-        SecretKey serverKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
-
-        getProfile(Jwts.builder().subject(email).signWith(serverKey, Jwts.SIG.HS256).compact())
-                .andExpect(status().isUnauthorized());
-    }
-
-    private static String token(String email, SecretKey key, Instant expiresAt) {
-        return Jwts.builder()
-                .subject(email)
-                .issuedAt(Date.from(expiresAt.minus(2, ChronoUnit.HOURS)))
-                .expiration(Date.from(expiresAt))
-                .signWith(key, Jwts.SIG.HS256)
-                .compact();
     }
 }

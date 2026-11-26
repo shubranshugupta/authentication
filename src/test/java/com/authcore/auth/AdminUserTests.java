@@ -34,7 +34,7 @@ class AdminUserTests extends IntegrationTest {
         register(email, PASSWORD);
 
         assertThat(user(email).getRole()).isEqualTo(Role.USER);
-        assertThat(UserPrincipal.from(user(email)).getAuthorities()).extracting(GrantedAuthority::getAuthority)
+        assertThat(UserPrincipal.from(user(email), 1L).getAuthorities()).extracting(GrantedAuthority::getAuthority)
                 .containsExactly("ROLE_USER");
     }
 

@@ -52,7 +52,7 @@ public class AuthConfigProperties {
 
     /**
      * Emails that get the ADMIN role: at registration, and for existing users at
-     * startup. The only way to create an admin; the API never grants the role.
+     * startup. This is how the first admins are created; they can make others admins.
      */
     private List<String> adminEmails = new ArrayList<>();
     @Valid
@@ -81,10 +81,19 @@ public class AuthConfigProperties {
 
         @ToString.Exclude
         private String secretKey;
+        /** The "iss" and "aud" of every access token. Tokens with others are refused. */
+        @NotBlank
+        private String issuer;
+        @NotBlank
+        private String audience;
         @Positive
         private long jwtExpiration;
+        /** How long a session lasts after it was last used. */
         @Positive
         private long refreshExpiration;
+        /** How long a session lasts at most, however often it's used. */
+        @Positive
+        private long sessionExpiration;
 
         // A check on a boolean, not on the field: the startup error prints the rejected
         // value, and that must not be the key.

@@ -13,10 +13,13 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.crypto.SecretKey;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 import org.mockito.invocation.Invocation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -29,12 +32,17 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.authcore.auth.token.TokenPurpose;
 import com.authcore.auth.user.User;
 import com.authcore.auth.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import jakarta.mail.Message;
 import jakarta.mail.Multipart;
 import jakarta.mail.Part;
@@ -71,6 +79,9 @@ public abstract class IntegrationTest {
 
     @MockitoBean
     protected JavaMailSender mailSender;
+
+    @Value("${auth.token.secret-key}")
+    private String jwtSecret;
 
     @BeforeEach
     void stubMailSender() {
@@ -140,17 +151,33 @@ public abstract class IntegrationTest {
         return mvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie));
     }
 
+    /** Refreshes and returns the new cookie. */
+    protected Cookie nextCookie(Cookie refreshCookie) throws Exception {
+        Cookie next = refresh(refreshCookie).andExpect(status().isOk()).andReturn().getResponse().getCookie("refreshToken");
+        if (next == null)
+            fail("refresh did not set a refreshToken cookie");
+        return next;
+    }
+
+    protected ResultActions logout(Cookie refreshCookie) throws Exception {
+        return mvc.perform(post("/api/v1/auth/logout").cookie(refreshCookie));
+    }
+
     protected String accessToken(String email, String password) throws Exception {
-        String body = login(email, password)
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(body, "$.accessToken");
+        return accessToken(login(email, password));
+    }
+
+    /** The access token in the answer to a login or refresh. */
+    protected static String accessToken(ResultActions answer) throws Exception {
+        return JsonPath.read(answer.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.accessToken");
     }
 
     protected Cookie refreshCookie(String email, String password) throws Exception {
-        Cookie cookie = login(email, password)
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getCookie("refreshToken");
+        return refreshCookie(login(email, password));
+    }
+
+    protected static Cookie refreshCookie(ResultActions login) throws Exception {
+        Cookie cookie = login.andExpect(status().isOk()).andReturn().getResponse().getCookie("refreshToken");
         if (cookie == null)
             fail("login did not set a refreshToken cookie");
         return cookie;
@@ -162,6 +189,10 @@ public abstract class IntegrationTest {
 
     protected ResultActions updateProfile(String accessToken, String body) throws Exception {
         return mvc.perform(as(accessToken, patch("/api/v1/users/me")).contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    protected ResultActions listSessions(String accessToken) throws Exception {
+        return mvc.perform(as(accessToken, get("/api/v1/users/me/sessions")));
     }
 
     protected ResultActions requestAccountDeletion(String accessToken) throws Exception {
@@ -176,11 +207,29 @@ public abstract class IntegrationTest {
                         """.formatted(otp, password)));
     }
 
+    /** The request comes from this address (by default every request has its own). */
+    protected static RequestPostProcessor from(String ip) {
+        return request -> {
+            request.setRemoteAddr(ip);
+            return request;
+        };
+    }
+
     protected static MockHttpServletRequestBuilder as(String accessToken, MockHttpServletRequestBuilder request) {
         return request.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
     }
 
     // ---- tokens --------------------------------------------------------------------
+
+    /** The key this server signs its access tokens with. */
+    protected SecretKey serverKey() {
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+    }
+
+    /** What an access token says. */
+    protected Claims claims(String accessToken) {
+        return Jwts.parser().verifyWith(serverKey()).build().parseSignedClaims(accessToken).getPayload();
+    }
 
     private static final Pattern LINK_TOKEN = Pattern.compile("token=([A-Za-z0-9_-]{43})");
     private static final Pattern CODE = Pattern.compile(">(\\d{8})<");

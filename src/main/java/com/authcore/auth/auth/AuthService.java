@@ -4,14 +4,20 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.ratelimit.LoginThrottle;
+import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.security.JwtService;
-import com.authcore.auth.session.RefreshTokenService;
+import com.authcore.auth.security.LoginDetails;
+import com.authcore.auth.session.ClientInfo;
+import com.authcore.auth.session.SessionService;
+import com.authcore.auth.session.SessionTokens;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.OneTimeTokenService;
 import com.authcore.auth.token.TokenPurpose;
@@ -34,8 +40,9 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final RefreshTokenService refreshTokenService;
+    private final SessionService sessions;
     private final AuthenticationManager manager;
+    private final LoginThrottle loginThrottle;
     private final OneTimeTokenService tokens;
     private final RetryingTransaction transaction;
     private final AuthConfigProperties authConfigProperties;
@@ -69,25 +76,39 @@ public class AuthService {
         }
     }
 
-    public TokenPair login(String email, String password) {
+    public TokenPair login(String email, String password, ClientInfo client) {
         String normalized = EmailAddresses.normalize(email);
+        loginThrottle.beforeCheck(normalized, client.ip());
+        LoginDetails user = checkPassword(normalized, password, client);
+        loginThrottle.succeeded(normalized, client.ip());
 
-        // H2: check the password first. An unknown email then fails exactly like
-        // a wrong password (401), instead of revealing that it isn't registered.
-        manager.authenticate(new UsernamePasswordAuthenticationToken(normalized, password));
-
-        // Only missing if the account was deleted a moment ago.
-        User user = userRepository.findByEmail(normalized)
+        return sessions.open(user.getId(), user.getTokenVersion(), client)
+                .map(this::tokenPair)
+                // The account was deleted, or its password changed, a moment ago.
                 .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
-
-        return new TokenPair(
-                jwtService.generateToken(user.getEmail()),
-                refreshTokenService.createRefreshToken(user).getRefreshToken());
     }
 
-    /** Returns a new access token. */
-    public String refresh(String refreshToken) {
-        return jwtService.generateToken(refreshTokenService.verifyRefreshToken(refreshToken).getEmail());
+    private LoginDetails checkPassword(String email, String password, ClientInfo client) {
+        try {
+            return (LoginDetails) manager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, password)).getPrincipal();
+        } catch (BadCredentialsException e) {
+            // H2: an unknown email fails exactly like a wrong password (401), instead of
+            // revealing that it isn't registered.
+            throw e;
+        } catch (AuthenticationException e) {
+            // E.g. the email isn't verified, or the database failed.
+            loginThrottle.notAGuess(email, client.ip());
+            throw e;
+        }
+    }
+
+    public TokenPair refresh(String refreshToken, ClientInfo client) {
+        return tokenPair(sessions.refresh(refreshToken, client));
+    }
+
+    public void logout(String refreshToken) {
+        sessions.close(refreshToken);
     }
 
     /** Sends the verification email again, if there is an account that needs it. */
@@ -108,16 +129,17 @@ public class AuthService {
             throw new InvalidCodeException(INVALID_VERIFICATION_LINK);
     }
 
-    /** Sends a password reset code, if there is a verified account with this email. */
+    /** Sends a password reset code, if there is an account with this email that can log in. */
     public void requestPasswordReset(String email) {
         userRepository.findByEmail(EmailAddresses.normalize(email))
-                .filter(User::isEnabled)
+                .filter(AuthService::canResetPassword)
                 .ifPresent(user -> tokens.issue(user.getId(), TokenPurpose.PASSWORD_RESET));
     }
 
-    public void resetPassword(String email, String code, String newPassword) {
-        User account = userRepository.findByEmail(EmailAddresses.normalize(email))
-                .filter(User::isEnabled)
+    public void resetPassword(String email, String code, String newPassword, String ip) {
+        String normalized = EmailAddresses.normalize(email);
+        User account = userRepository.findByEmail(normalized)
+                .filter(AuthService::canResetPassword)
                 .orElseThrow(() -> new InvalidCodeException(INVALID_CODE));
 
         boolean reset = transaction.run(() -> tokens
@@ -125,12 +147,22 @@ public class AuthService {
                 .map(user -> {
                     user.setPassword(passwordEncoder.encode(newPassword));
                     userRepository.save(user);
-                    // Whoever knew the old password may hold the refresh token. (The copy in
-                    // the Redis cache goes in Phase 5, C2.)
-                    refreshTokenService.deleteRefreshToken(user);
+                    // Whoever knew the old password may be logged in.
+                    sessions.endAll(user);
                     return true;
                 }).orElse(false));
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
+        loginThrottle.passwordChanged(normalized, ip);
+    }
+
+    private static boolean canResetPassword(User user) {
+        return user.isEnabled() && !user.isLocked();
+    }
+
+    private TokenPair tokenPair(SessionTokens session) {
+        String accessToken = jwtService.generateToken(
+                new AccessToken(session.userId(), session.tokenVersion(), session.sessionId()));
+        return new TokenPair(accessToken, session.refreshToken(), session.validFor());
     }
 }

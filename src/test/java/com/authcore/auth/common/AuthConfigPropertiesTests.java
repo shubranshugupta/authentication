@@ -84,6 +84,16 @@ class AuthConfigPropertiesTests {
         TokenConfigProperties token = token(base64(32));
         token.setJwtExpiration(0);
         token.setRefreshExpiration(-1);
+        token.setSessionExpiration(0);
+
+        assertThat(VALIDATOR.validate(token)).hasSize(3);
+    }
+
+    @Test
+    void accessTokensNeedAnIssuerAndAnAudience() {
+        TokenConfigProperties token = token(base64(32));
+        token.setIssuer("");
+        token.setAudience(" ");
 
         assertThat(VALIDATOR.validate(token)).hasSize(2);
     }
@@ -117,8 +127,11 @@ class AuthConfigPropertiesTests {
     private static TokenConfigProperties token(String secretKey) {
         TokenConfigProperties token = new TokenConfigProperties();
         token.setSecretKey(secretKey);
+        token.setIssuer("authcore");
+        token.setAudience("authcore");
         token.setJwtExpiration(1);
         token.setRefreshExpiration(1);
+        token.setSessionExpiration(1);
         return token;
     }
 
