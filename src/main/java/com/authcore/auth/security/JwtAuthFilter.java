@@ -67,7 +67,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 .findUserOfActiveSession(accessToken.sessionId(), accessToken.userId(), Instant.now())
                 // The version was raised since, e.g. by a password reset (H6).
                 .filter(user -> user.getTokenVersion() == accessToken.tokenVersion())
-                .map(UserPrincipal::from)
+                .map(user -> UserPrincipal.from(user, accessToken.sessionId()))
                 .orElseThrow(() -> new InvalidTokenException(JwtService.INVALID_TOKEN));
 
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 
 import org.jspecify.annotations.Nullable;
@@ -123,6 +124,33 @@ public class SessionService {
                     sessionRepository.end(found.getSessionId());
                     return found;
                 }));
+    }
+
+    /** The sessions of a user, the last used one first. */
+    public List<SessionResponse> list(Integer userId, Long currentSessionId) {
+        return sessionRepository.findByUserIdAndExpiresAtAfterOrderByLastUsedAtDescIdDesc(userId, Instant.now()).stream()
+                .map(session -> SessionResponse.from(session, currentSessionId))
+                .toList();
+    }
+
+    /** Ends one of the user's sessions. */
+    public void end(Integer userId, Long sessionId) {
+        transaction.run(() -> userRepository.findAndLockById(userId)
+                .flatMap(user -> sessionRepository.findById(sessionId))
+                .filter(session -> session.getUserId().equals(userId))
+                .map(session -> {
+                    sessionRepository.end(sessionId);
+                    return session;
+                }))
+                // Also if it's somebody else's: whether that exists is none of their business.
+                .orElseThrow(() -> new SessionNotFoundException(sessionId));
+    }
+
+    public void endAll(Integer userId) {
+        transaction.run(() -> userRepository.findAndLockById(userId).map(user -> {
+            endAll(user);
+            return user;
+        }));
     }
 
     /** Ends all sessions of this user, which the caller has locked. */

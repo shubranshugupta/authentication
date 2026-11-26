@@ -32,9 +32,10 @@ public enum ErrorCode {
     // codes and links from emails (400, not 401: the login is fine, so a client must not refresh it)
     INVALID_CODE(HttpStatus.BAD_REQUEST, "Invalid or expired code"),
 
-    // users
+    // users and sessions
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "User already exists"),
+    SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "Session not found"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred");
 

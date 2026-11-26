@@ -190,6 +190,10 @@ public abstract class IntegrationTest {
         return mvc.perform(as(accessToken, patch("/api/v1/users/me")).contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
+    protected ResultActions listSessions(String accessToken) throws Exception {
+        return mvc.perform(as(accessToken, get("/api/v1/users/me/sessions")));
+    }
+
     protected ResultActions requestAccountDeletion(String accessToken) throws Exception {
         return mvc.perform(as(accessToken, post("/api/v1/users/me/deletion")));
     }

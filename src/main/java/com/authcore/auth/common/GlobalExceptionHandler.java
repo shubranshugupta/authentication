@@ -29,6 +29,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import com.authcore.auth.security.InvalidTokenException;
 import com.authcore.auth.security.TokenExpireException;
+import com.authcore.auth.session.SessionNotFoundException;
 import com.authcore.auth.token.InvalidCodeException;
 import com.authcore.auth.token.TokenAlreadyExistsException;
 import com.authcore.auth.user.UserAlreadyExistsException;
@@ -90,7 +91,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ErrorCode.TOKEN_ALREADY_EXISTS, e.getMessage());
     }
 
-    // ---- users ---------------------------------------------------------------------
+    // ---- users and sessions ---------------------------------------------------------------------
 
     @ExceptionHandler
     ProblemDetail handle(UserAlreadyExistsException e) {
@@ -100,6 +101,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(UserNotFoundException e) {
         return problem(ErrorCode.USER_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(SessionNotFoundException e) {
+        return problem(ErrorCode.SESSION_NOT_FOUND, e.getMessage());
     }
 
     // ---- everything else -----------------------------------------------------------

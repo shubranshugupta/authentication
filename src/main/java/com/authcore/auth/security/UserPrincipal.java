@@ -15,10 +15,11 @@ import com.authcore.auth.user.User;
  * ({@code @AuthenticationPrincipal UserPrincipal me}). Separate from the {@link User}
  * entity, so the password hash and the other columns stay out of the security context.
  */
-public record UserPrincipal(Integer id, String email, Role role, boolean enabled) implements UserDetails {
+public record UserPrincipal(Integer id, String email, Role role, boolean enabled, Long sessionId)
+        implements UserDetails {
 
-    public static UserPrincipal from(User user) {
-        return new UserPrincipal(user.getId(), user.getEmail(), user.getRole(), user.isEnabled());
+    public static UserPrincipal from(User user, Long sessionId) {
+        return new UserPrincipal(user.getId(), user.getEmail(), user.getRole(), user.isEnabled(), sessionId);
     }
 
     @Override
