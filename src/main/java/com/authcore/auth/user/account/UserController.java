@@ -52,7 +52,7 @@ public class UserController {
     public ResponseEntity<AuthResponse> changePassword(@AuthenticationPrincipal UserPrincipal me,
             @Valid @RequestBody ChangePasswordRequest request, HttpServletRequest http) {
         String accessToken = authService.changePassword(me.id(), me.sessionId(), request.currentPassword(),
-                request.newPassword(), ClientInfo.of(http).ip());
+                request.newPassword(), ClientInfo.of(http));
         return ResponseEntity.ok(AuthResponse.builder().accessToken(accessToken).build());
     }
 

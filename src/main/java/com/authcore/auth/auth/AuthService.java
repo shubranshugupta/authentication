@@ -16,6 +16,8 @@ import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.notification.SecurityAlert;
+import com.authcore.auth.notification.SecurityNotifier;
 import com.authcore.auth.ratelimit.LoginThrottle;
 import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.AccessToken;
@@ -57,6 +59,7 @@ public class AuthService {
     private final AuthConfigProperties authConfigProperties;
     private final AuditLog audit;
     private final Reauthentication reauthentication;
+    private final SecurityNotifier notifier;
 
     public void register(RegisterRequest request) {
         String email = EmailAddresses.normalize(request.getEmail());
@@ -177,7 +180,7 @@ public class AuthService {
                 .ifPresent(user -> tokens.issue(user.getId(), TokenPurpose.PASSWORD_RESET));
     }
 
-    public void resetPassword(String email, String code, String newPassword, String ip) {
+    public void resetPassword(String email, String code, String newPassword, ClientInfo client) {
         String normalized = EmailAddresses.normalize(email);
         User account = userRepository.findByEmail(normalized)
                 .filter(AuthService::canResetPassword)
@@ -194,8 +197,9 @@ public class AuthService {
                 }).orElse(false));
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
-        loginThrottle.passwordChanged(normalized, ip);
+        loginThrottle.passwordChanged(normalized, client.ip());
         audit.record(AuditEvent.PASSWORD_RESET, account.getId());
+        notifier.send(account.getId(), SecurityAlert.PASSWORD_RESET, client);
     }
 
     /**
@@ -209,8 +213,8 @@ public class AuthService {
      * @throws InvalidTokenException if this session ended, or the password changed, meanwhile
      */
     public String changePassword(Integer userId, Long sessionId, String currentPassword, String newPassword,
-            String ip) {
-        User checked = reauthentication.check(new PasswordConfirmation(userId, currentPassword, ip));
+            ClientInfo client) {
+        User checked = reauthentication.check(new PasswordConfirmation(userId, currentPassword, client.ip()));
         String passwordHash = passwordEncoder.encode(newPassword);
 
         SessionTokens session = transaction.run(() -> {
@@ -223,8 +227,9 @@ public class AuthService {
             return sessions.endAllExcept(user, sessionId)
                     .orElseThrow(() -> new InvalidTokenException(JwtService.INVALID_TOKEN));
         });
-        loginThrottle.passwordChanged(checked.getEmail(), ip);
+        loginThrottle.passwordChanged(checked.getEmail(), client.ip());
         audit.record(AuditEvent.PASSWORD_CHANGED, userId, "sessionId", sessionId);
+        notifier.send(userId, SecurityAlert.PASSWORD_CHANGED, client);
         return tokenPair(session).accessToken();
     }
 

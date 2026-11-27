@@ -107,7 +107,7 @@ public class AuthController {
         String ip = http.getRemoteAddr();
         rateLimiter.acquire(RateLimit.RESET_CONFIRM_PER_IP.forIp(ip),
                 RateLimit.RESET_CONFIRM_PER_IP_AND_ACCOUNT.forIpAndAccount(ip, request.getEmail()));
-        authService.resetPassword(request.getEmail(), request.getOtp(), request.getPassword(), ip);
+        authService.resetPassword(request.getEmail(), request.getOtp(), request.getPassword(), ClientInfo.of(http));
         return message("Password reset successfully");
     }
 

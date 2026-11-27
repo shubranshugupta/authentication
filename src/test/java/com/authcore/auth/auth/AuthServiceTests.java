@@ -44,6 +44,8 @@ import com.authcore.auth.security.LoginDetails;
 import com.authcore.auth.security.PasswordConfirmation;
 import com.authcore.auth.security.Reauthentication;
 import com.authcore.auth.security.WrongPasswordException;
+import com.authcore.auth.notification.SecurityAlert;
+import com.authcore.auth.notification.SecurityNotifier;
 import com.authcore.auth.session.ClientInfo;
 import com.authcore.auth.session.SessionService;
 import com.authcore.auth.session.SessionTokens;
@@ -78,6 +80,8 @@ class AuthServiceTests {
     private OneTimeTokenService tokens;
     @Mock
     private Reauthentication reauthentication;
+    @Mock
+    private SecurityNotifier notifier;
 
     private final AuthConfigProperties properties = new AuthConfigProperties();
     private AuthService authService;
@@ -86,7 +90,7 @@ class AuthServiceTests {
     void createService() {
         authService = new AuthService(userRepository, passwordEncoder, jwtService, sessions, manager,
                 loginThrottle, tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties,
-                new AuditLog(new SimpleMeterRegistry()), reauthentication);
+                new AuditLog(new SimpleMeterRegistry()), reauthentication, notifier);
     }
 
     // ---- registration --------------------------------------------------------------
@@ -263,7 +267,7 @@ class AuthServiceTests {
         when(tokens.consumeCode(any(), any(), any(), any())).thenReturn(Optional.empty());
 
         for (String email : List.of("unknown@example.com", "unverified@example.com", EMAIL))
-            assertThatThrownBy(() -> authService.resetPassword(email, "12345678", "new", CLIENT.ip()))
+            assertThatThrownBy(() -> authService.resetPassword(email, "12345678", "new", CLIENT))
                     .isInstanceOf(InvalidCodeException.class).hasMessage(AuthService.INVALID_CODE);
         verify(userRepository, never()).save(any());
         verifyNoInteractions(passwordEncoder, sessions, loginThrottle);
@@ -297,11 +301,12 @@ class AuthServiceTests {
         when(tokens.consumeCode(eq(1), eq("12345678"), eq(TokenPurpose.PASSWORD_RESET), any())).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("new")).thenReturn("new-hash");
 
-        authService.resetPassword(" Jane@Example.com", "12345678", "new", CLIENT.ip());
+        authService.resetPassword(" Jane@Example.com", "12345678", "new", CLIENT);
 
         assertThat(savedUser().getPassword()).isEqualTo("new-hash");
         verify(sessions).endAll(user);
         verify(loginThrottle).passwordChanged(EMAIL, CLIENT.ip());
+        verify(notifier).send(1, SecurityAlert.PASSWORD_RESET, CLIENT);
     }
 
     // ---- helpers -------------------------------------------------------------------
@@ -351,20 +356,21 @@ class AuthServiceTests {
         when(sessions.endAllExcept(user, 42L)).thenReturn(Optional.of(new SessionTokens(7, 4, 42L, null, WEEK)));
         when(jwtService.generateToken(new AccessToken(7, 4, 42L))).thenReturn("access");
 
-        assertThat(authService.changePassword(7, 42L, "current", "new", IP)).isEqualTo("access");
+        assertThat(authService.changePassword(7, 42L, "current", "new", CLIENT)).isEqualTo("access");
 
         assertThat(user.getPassword()).isEqualTo("new-hash");
         verify(loginThrottle).passwordChanged(EMAIL, IP);
+        verify(notifier).send(7, SecurityAlert.PASSWORD_CHANGED, CLIENT);
     }
 
     @Test
     void aWrongCurrentPasswordChangesNothing() {
         when(reauthentication.check(any())).thenThrow(new WrongPasswordException());
 
-        assertThatThrownBy(() -> authService.changePassword(7, 42L, "wrong", "new", IP))
+        assertThatThrownBy(() -> authService.changePassword(7, 42L, "wrong", "new", CLIENT))
                 .isInstanceOf(WrongPasswordException.class);
 
-        verifyNoInteractions(userRepository, sessions, jwtService);
+        verifyNoInteractions(userRepository, sessions, jwtService, notifier);
     }
 
     /** E.g. a password reset between the check and the change: it ended this session too. */
@@ -374,11 +380,11 @@ class AuthServiceTests {
         when(reauthentication.check(any())).thenReturn(userWithVersion(3));
         when(userRepository.findAndLockById(7)).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> authService.changePassword(7, 42L, "current", "new", IP))
+        assertThatThrownBy(() -> authService.changePassword(7, 42L, "current", "new", CLIENT))
                 .isInstanceOf(InvalidTokenException.class);
 
         assertThat(user.getPassword()).isEqualTo("old-hash");
-        verifyNoInteractions(sessions, jwtService);
+        verifyNoInteractions(sessions, jwtService, notifier);
         verify(loginThrottle, never()).passwordChanged(any(), any());
     }
 
@@ -389,10 +395,10 @@ class AuthServiceTests {
         when(userRepository.findAndLockById(7)).thenReturn(Optional.of(user));
         when(sessions.endAllExcept(user, 42L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.changePassword(7, 42L, "current", "new", IP))
+        assertThatThrownBy(() -> authService.changePassword(7, 42L, "current", "new", CLIENT))
                 .isInstanceOf(InvalidTokenException.class);
 
-        verifyNoInteractions(jwtService);
+        verifyNoInteractions(jwtService, notifier);
         verify(loginThrottle, never()).passwordChanged(any(), any());
     }
 }
