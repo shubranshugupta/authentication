@@ -16,7 +16,20 @@ public enum SecurityAlert {
             "If this was you, there's nothing to do. If it wasn't, someone can read your email: secure your email account, then reset your password again."),
     SESSIONS_ENDED("You were logged out of AuthCore everywhere", "You were logged out everywhere",
             "One of your sign-ins was used from two places, so someone may have a copy of it. To be safe, every device was logged out.",
-            "Sign in again. If you didn't expect this, change your password.");
+            "Sign in again. If you didn't expect this, change your password."),
+    TWO_FACTOR_ENABLED("Two-factor authentication is on for your AuthCore account", "Two-factor authentication is on",
+            "Signing in to your account now needs a code from an authenticator app, as well as the password.",
+            "If this was you, keep your recovery codes somewhere safe. If it wasn't, someone has your password: reset it now with \"Forgot password\", and ask an administrator to turn two-factor authentication off."),
+    TWO_FACTOR_DISABLED("Two-factor authentication is off for your AuthCore account", "Two-factor authentication is off",
+            "Signing in to your account no longer needs a code from an authenticator app, only the password.",
+            "If this was you, there's nothing to do. If it wasn't, reset your password now with \"Forgot password\", then turn two-factor authentication on again."),
+    TWO_FACTOR_DISABLED_BY_ADMIN("Two-factor authentication is off for your AuthCore account",
+            "Two-factor authentication is off",
+            "An administrator turned two-factor authentication off for your account, as you asked after losing your phone and recovery codes. Signing in needs only the password now. The address and device below are the administrator's.",
+            "Turn two-factor authentication on again with your new phone. If you didn't ask for this, reset your password now with \"Forgot password\"."),
+    RECOVERY_CODE_USED("A recovery code was used to sign in to AuthCore", "A recovery code was used",
+            "Your account was signed in to with one of its recovery codes instead of a code from the app. Each recovery code works once.",
+            "If this was you and you lost your phone, turn two-factor authentication off and on again with your new phone. If it wasn't you, reset your password now with \"Forgot password\", and make new recovery codes.");
 
     final String subject;
     final String heading;

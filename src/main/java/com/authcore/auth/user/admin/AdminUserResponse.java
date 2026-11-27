@@ -14,10 +14,11 @@ public record AdminUserResponse(
         Role role,
         boolean emailVerified,
         boolean locked,
+        boolean twoFactorEnabled,
         Instant createdAt,
         Instant updatedAt) {
 
-    public static AdminUserResponse from(User user) {
+    public static AdminUserResponse from(User user, boolean twoFactorEnabled) {
         return new AdminUserResponse(
                 user.getId(),
                 user.getEmail(),
@@ -26,6 +27,7 @@ public record AdminUserResponse(
                 user.getRole(),
                 user.isEnabled(),
                 user.isLocked(),
+                twoFactorEnabled,
                 user.getCreatedAt(),
                 user.getUpdatedAt());
     }

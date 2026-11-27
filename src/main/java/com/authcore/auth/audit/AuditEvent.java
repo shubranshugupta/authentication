@@ -2,10 +2,23 @@ package com.authcore.auth.audit;
 
 /** What the audit log records (F2). The names are part of the log format: don't rename them. */
 public enum AuditEvent {
-    /** With "sessionId", and "newDevice" (true if the owner was emailed about it). */
+    /**
+     * With "sessionId", "newDevice" (true if the owner was emailed about it), and for a user
+     * with two-factor authentication "secondFactor" (APP or RECOVERY_CODE).
+     */
     LOGIN_SUCCEEDED,
-    /** With "reason": WRONG_PASSWORD, UNKNOWN_ACCOUNT, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, RATE_LIMITED or ACCOUNT_CHANGED. */
+    /**
+     * With "reason": WRONG_PASSWORD, UNKNOWN_ACCOUNT, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED,
+     * RATE_LIMITED, ACCOUNT_CHANGED, or at the second step WRONG_CODE, CODE_RATE_LIMITED or
+     * EXPIRED.
+     */
     LOGIN_FAILED,
+    /** The password was right; the login waits for the code from the app. */
+    SECOND_FACTOR_REQUIRED,
+    TWO_FACTOR_ENABLED,
+    /** By the user, or by the admin "by". */
+    TWO_FACTOR_DISABLED,
+    RECOVERY_CODES_RENEWED,
     /** The user logged out of this session ("sessionId"). */
     LOGOUT,
     /** The user logged one of their devices out ("sessionId"). */

@@ -32,6 +32,13 @@ public enum ErrorCode {
     // 403, not 401: the access token is fine, so a client must not refresh it or log out
     WRONG_PASSWORD(HttpStatus.FORBIDDEN, "Wrong password"),
 
+    // two-factor authentication
+    /** The second step of a login came too late, or the account changed since: log in again. */
+    TWO_FACTOR_LOGIN_EXPIRED(HttpStatus.UNAUTHORIZED, "Log in again"),
+    TWO_FACTOR_ALREADY_ENABLED(HttpStatus.CONFLICT, "Two-factor authentication is on already"),
+    TWO_FACTOR_NOT_SET_UP(HttpStatus.CONFLICT, "Two-factor authentication isn't set up"),
+    TWO_FACTOR_NOT_ENABLED(HttpStatus.CONFLICT, "Two-factor authentication is off"),
+
     // codes and links from emails (400, not 401: the login is fine, so a client must not refresh it)
     INVALID_CODE(HttpStatus.BAD_REQUEST, "Invalid or expired code"),
 
