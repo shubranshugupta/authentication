@@ -69,6 +69,34 @@ public class AuthConfigProperties {
     private MailConfigProperties mail = new MailConfigProperties();
     @Valid
     private CookieConfigProperties cookie = new CookieConfigProperties();
+    @Valid
+    private TotpConfigProperties totp = new TotpConfigProperties();
+
+    /** Two-factor authentication with an authenticator app (F5). */
+    @Data
+    @NoArgsConstructor
+    public static class TotpConfigProperties {
+        private static final int KEY_BYTES = 32;
+
+        /** Encrypts the users' TOTP secrets. Changing it makes every one of them unusable. */
+        @ToString.Exclude
+        private String encryptionKey;
+
+        /** The name authenticator apps show next to the codes. */
+        @NotBlank
+        private String issuer = "AuthCore";
+
+        // On a boolean, like the JWT key: the startup error must not print the key.
+        @AssertTrue(message = "auth.totp.encryption-key (TOTP_ENCRYPTION_KEY) must be a base64 key of exactly "
+                + KEY_BYTES + " bytes")
+        public boolean isEncryptionKeyValid() {
+            try {
+                return encryptionKey != null && Decoders.BASE64.decode(encryptionKey).length == KEY_BYTES;
+            } catch (DecodingException e) {
+                return false;
+            }
+        }
+    }
 
     /**
      * Expirations are in milliseconds. Validated at startup: an unset JWT_SECRET_KEY is
