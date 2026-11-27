@@ -16,8 +16,13 @@ public enum AuditEvent {
     REFRESH_TOKEN_REUSED,
     /** With an emailed code. All of the user's sessions ended. */
     PASSWORD_RESET,
+    /** By the logged-in user, who stays logged in on this session ("sessionId"). All other sessions ended. */
+    PASSWORD_CHANGED,
     ACCOUNT_DELETED,
-    /** A password typed again for an admin action was wrong ("reason": WRONG_PASSWORD or RATE_LIMITED). */
+    /**
+     * A password typed again, for an admin action or a password change, was wrong
+     * ("reason": WRONG_PASSWORD or RATE_LIMITED).
+     */
     PASSWORD_CONFIRMATION_FAILED,
     /** By the admin "by". */
     USER_LOCKED,

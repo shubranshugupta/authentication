@@ -38,8 +38,12 @@ import com.authcore.auth.ratelimit.LoginThrottle;
 import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.AccessToken;
 import com.authcore.auth.audit.AuditLog;
+import com.authcore.auth.security.InvalidTokenException;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.security.LoginDetails;
+import com.authcore.auth.security.PasswordConfirmation;
+import com.authcore.auth.security.Reauthentication;
+import com.authcore.auth.security.WrongPasswordException;
 import com.authcore.auth.session.ClientInfo;
 import com.authcore.auth.session.SessionService;
 import com.authcore.auth.session.SessionTokens;
@@ -72,6 +76,8 @@ class AuthServiceTests {
     private LoginThrottle loginThrottle;
     @Mock
     private OneTimeTokenService tokens;
+    @Mock
+    private Reauthentication reauthentication;
 
     private final AuthConfigProperties properties = new AuthConfigProperties();
     private AuthService authService;
@@ -80,7 +86,7 @@ class AuthServiceTests {
     void createService() {
         authService = new AuthService(userRepository, passwordEncoder, jwtService, sessions, manager,
                 loginThrottle, tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties,
-                new AuditLog(new SimpleMeterRegistry()));
+                new AuditLog(new SimpleMeterRegistry()), reauthentication);
     }
 
     // ---- registration --------------------------------------------------------------
@@ -325,5 +331,68 @@ class AuthServiceTests {
 
     private static User user(boolean enabled) {
         return User.builder().id(1).email(EMAIL).password("old-hash").role(Role.USER).enabled(enabled).build();
+    }
+
+    // ---- change password -----------------------------------------------------------
+
+    private static final String IP = "203.0.113.7";
+
+    private User userWithVersion(int version) {
+        return User.builder().id(7).email(EMAIL).password("old-hash").role(Role.USER).enabled(true)
+                .tokenVersion(version).build();
+    }
+
+    @Test
+    void changePasswordKeepsThisSessionAndGivesItANewAccessToken() {
+        User user = userWithVersion(3);
+        when(reauthentication.check(new PasswordConfirmation(7, "current", IP))).thenReturn(userWithVersion(3));
+        when(passwordEncoder.encode("new")).thenReturn("new-hash");
+        when(userRepository.findAndLockById(7)).thenReturn(Optional.of(user));
+        when(sessions.endAllExcept(user, 42L)).thenReturn(Optional.of(new SessionTokens(7, 4, 42L, null, WEEK)));
+        when(jwtService.generateToken(new AccessToken(7, 4, 42L))).thenReturn("access");
+
+        assertThat(authService.changePassword(7, 42L, "current", "new", IP)).isEqualTo("access");
+
+        assertThat(user.getPassword()).isEqualTo("new-hash");
+        verify(loginThrottle).passwordChanged(EMAIL, IP);
+    }
+
+    @Test
+    void aWrongCurrentPasswordChangesNothing() {
+        when(reauthentication.check(any())).thenThrow(new WrongPasswordException());
+
+        assertThatThrownBy(() -> authService.changePassword(7, 42L, "wrong", "new", IP))
+                .isInstanceOf(WrongPasswordException.class);
+
+        verifyNoInteractions(userRepository, sessions, jwtService);
+    }
+
+    /** E.g. a password reset between the check and the change: it ended this session too. */
+    @Test
+    void aPasswordChangedSinceTheCheckIsNotOverwritten() {
+        User user = userWithVersion(4);
+        when(reauthentication.check(any())).thenReturn(userWithVersion(3));
+        when(userRepository.findAndLockById(7)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.changePassword(7, 42L, "current", "new", IP))
+                .isInstanceOf(InvalidTokenException.class);
+
+        assertThat(user.getPassword()).isEqualTo("old-hash");
+        verifyNoInteractions(sessions, jwtService);
+        verify(loginThrottle, never()).passwordChanged(any(), any());
+    }
+
+    @Test
+    void anEndedSessionGetsNoNewAccessToken() {
+        User user = userWithVersion(3);
+        when(reauthentication.check(any())).thenReturn(userWithVersion(3));
+        when(userRepository.findAndLockById(7)).thenReturn(Optional.of(user));
+        when(sessions.endAllExcept(user, 42L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.changePassword(7, 42L, "current", "new", IP))
+                .isInstanceOf(InvalidTokenException.class);
+
+        verifyNoInteractions(jwtService);
+        verify(loginThrottle, never()).passwordChanged(any(), any());
     }
 }

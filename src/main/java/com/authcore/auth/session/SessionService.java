@@ -170,6 +170,26 @@ public class SessionService {
         userRepository.save(user);
     }
 
+    /**
+     * Ends all other sessions of this user, which the caller has locked, and makes every
+     * access token stop working, this session's too: a new one comes from the tokens returned.
+     *
+     * @return this session, without a new refresh token (the client keeps its own); empty
+     *         if it has ended, and then nothing was changed
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<SessionTokens> endAllExcept(User user, Long sessionId) {
+        Instant now = Instant.now();
+        return sessionRepository.findById(sessionId)
+                .filter(session -> session.getUserId().equals(user.getId()) && !session.isExpired(now))
+                .map(session -> {
+                    sessionRepository.endAllExcept(user.getId(), sessionId);
+                    user.invalidateAccessTokens();
+                    userRepository.save(user);
+                    return tokens(user, session, null, now);
+                });
+    }
+
     private SessionTokens renew(User user, UserSession session, ClientInfo client, Instant now) {
         session.use(client, now, expiry(session, now));
         sessionRepository.save(session);

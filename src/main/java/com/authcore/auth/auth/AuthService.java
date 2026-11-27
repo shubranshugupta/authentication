@@ -19,8 +19,11 @@ import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.ratelimit.LoginThrottle;
 import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.AccessToken;
+import com.authcore.auth.security.InvalidTokenException;
 import com.authcore.auth.security.JwtService;
 import com.authcore.auth.security.LoginDetails;
+import com.authcore.auth.security.PasswordConfirmation;
+import com.authcore.auth.security.Reauthentication;
 import com.authcore.auth.session.ClientInfo;
 import com.authcore.auth.session.SessionService;
 import com.authcore.auth.session.SessionTokens;
@@ -34,7 +37,7 @@ import com.authcore.auth.user.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
-/** Registration, login and password reset. Knows nothing about HTTP (A5). */
+/** Registration, login, password reset and password change. Knows nothing about HTTP (A5). */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -53,6 +56,7 @@ public class AuthService {
     private final RetryingTransaction transaction;
     private final AuthConfigProperties authConfigProperties;
     private final AuditLog audit;
+    private final Reauthentication reauthentication;
 
     public void register(RegisterRequest request) {
         String email = EmailAddresses.normalize(request.getEmail());
@@ -192,6 +196,36 @@ public class AuthService {
             throw new InvalidCodeException(INVALID_CODE);
         loginThrottle.passwordChanged(normalized, ip);
         audit.record(AuditEvent.PASSWORD_RESET, account.getId());
+    }
+
+    /**
+     * Changes the password of a logged-in user, who types the current one again: a stolen
+     * access token isn't enough. Logs out every other device, since whoever knew the old
+     * password may be logged in there, but not this one.
+     *
+     * @return a new access token for this session: the old one stops working, like every
+     *         other one; the refresh token stays the same
+     * @throws com.authcore.auth.security.WrongPasswordException if the current password is wrong
+     * @throws InvalidTokenException if this session ended, or the password changed, meanwhile
+     */
+    public String changePassword(Integer userId, Long sessionId, String currentPassword, String newPassword,
+            String ip) {
+        User checked = reauthentication.check(new PasswordConfirmation(userId, currentPassword, ip));
+        String passwordHash = passwordEncoder.encode(newPassword);
+
+        SessionTokens session = transaction.run(() -> {
+            User user = userRepository.findAndLockById(userId)
+                    // A reset or another change raised the version, and ended this session.
+                    .filter(found -> found.getTokenVersion() == checked.getTokenVersion())
+                    .orElseThrow(() -> new InvalidTokenException(JwtService.INVALID_TOKEN));
+            user.setPassword(passwordHash);
+            // Throwing rolls the new password back.
+            return sessions.endAllExcept(user, sessionId)
+                    .orElseThrow(() -> new InvalidTokenException(JwtService.INVALID_TOKEN));
+        });
+        loginThrottle.passwordChanged(checked.getEmail(), ip);
+        audit.record(AuditEvent.PASSWORD_CHANGED, userId, "sessionId", sessionId);
+        return tokenPair(session).accessToken();
     }
 
     private static boolean canResetPassword(User user) {

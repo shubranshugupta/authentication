@@ -24,6 +24,7 @@ class ApiDocsTests extends IntegrationTest {
                 .andExpect(jsonPath("$.components.securitySchemes.bearer.scheme").value("bearer"))
                 .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/users/me/sessions'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/users/me/password'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/admin/users/{id}/role'].put").exists())
                 // The login needs no token; the others do (the default).
                 .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.security", empty()))
