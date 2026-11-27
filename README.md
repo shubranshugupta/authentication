@@ -11,6 +11,7 @@ This project is a comprehensive authentication system built using Spring Boot. I
 - Emailed Codes and Links: Verify an email, reset a password, change the email or delete an account. They are stored only as hashes, work once, expire, and stop working after 5 wrong guesses.
 - Change Email: The new address is confirmed with a code; the old one gets a link that changes it back for 7 days.
 - Two-Factor Authentication: Optional codes from an authenticator app (TOTP) at every login, with recovery codes. The secrets are encrypted.
+- Sign in with Google: Optional, with OpenID Connect. Accounts are matched by Google's id, or by a verified email the first time.
 - Security Emails: The owner is told about a login from a new device, a password change or reset, an email change, two-factor authentication turned on or off, a used recovery code, and a copied refresh token, with when and from where.
 - Operations: Health checks and Prometheus metrics on a separate port, JSON logs with a trace id per request, an audit log of security events, OpenAPI documentation, a Docker image, and CI.
 
@@ -53,6 +54,8 @@ cp env.properties.example env.properties
 Then fill in `JWT_SECRET_KEY`: a base64 key of at least 32 bytes. Generate one with `openssl rand -base64 48`.
 
 And `TOTP_ENCRYPTION_KEY`, which encrypts the two-factor secrets: a base64 key of exactly 32 bytes. Generate one with `openssl rand -base64 32`, and keep it (see Two-Factor Authentication).
+
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are optional: without them, there is no Google sign-in (see Signing in with Google).
 
 The database, Redis and mail defaults already match `docker-compose.yml`. Any setting can also be given as an environment variable, which takes priority over the file.
 
@@ -133,7 +136,7 @@ Besides the usual JVM, HTTP and database pool metrics, the app counts:
 
 - Every log line of a request has its trace id. A `500` answer names it (`"traceId"`), so its details can be found in the log.
 - In `prod`, every line is a JSON object ([Elastic Common Schema](https://www.elastic.co/guide/en/ecs/current/index.html)), for a log collector such as CloudWatch, Loki or Elasticsearch.
-- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `EMAIL_CHANGED`, `EMAIL_CHANGE_UNDONE`, `SECOND_FACTOR_REQUIRED`, `TWO_FACTOR_ENABLED`, `TWO_FACTOR_DISABLED`, `RECOVERY_CODES_RENEWED`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
+- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `EMAIL_CHANGED`, `EMAIL_CHANGE_UNDONE`, `SECOND_FACTOR_REQUIRED`, `TWO_FACTOR_ENABLED`, `TWO_FACTOR_DISABLED`, `RECOVERY_CODES_RENEWED`, `GOOGLE_SIGN_UP`, `GOOGLE_LINKED`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
 
 ### Cleanup
 
@@ -185,6 +188,7 @@ Packages under `com.authcore.auth` are grouped by feature:
 | `session` | sessions and refresh tokens, logout |
 | `security` | Spring Security setup, access tokens (JWT) |
 | `mfa` | two-factor authentication: TOTP, recovery codes, the login's second step |
+| `social` | signing in with Google |
 | `ratelimit` | limits on logins, code guesses and emails |
 | `notification` | emails |
 | `audit` | the audit log |
@@ -201,6 +205,8 @@ Packages under `com.authcore.auth` are grouped by feature:
 | `POST /api/v1/auth/email-verification/confirm` | `token` | Verifies the email with the token from the link |
 | `POST /api/v1/auth/login` | `email`, `password` | Returns an access token, and sets the refresh token as a cookie. With two-factor authentication, returns a `challenge` instead |
 | `POST /api/v1/auth/login/2fa` | `challenge`, `code` | The second step of a login with two-factor authentication: returns what a login returns |
+| `GET /api/v1/auth/oauth2/authorization/google` | | Sends the browser to Google (only with `GOOGLE_CLIENT_ID`) |
+| `POST /api/v1/auth/oauth2/exchange` | `code` | After signing in with Google: returns what a login returns |
 | `POST /api/v1/auth/refresh` | (refresh cookie) | Returns a new access token, and replaces the refresh cookie |
 | `POST /api/v1/auth/logout` | (refresh cookie) | Ends the session and deletes the cookie |
 | `POST /api/v1/auth/password-reset` | `email` | Emails a reset code |
@@ -255,6 +261,7 @@ Beyond a limit, the answer is `429` with the code `TOO_MANY_REQUESTS` and a `Ret
 | Confirming a password reset | 30 per address in 15 minutes; 10 per account from one address in an hour |
 | Undoing an email change | 30 per address in 15 minutes |
 | Two-factor codes at login | 30 per address in 15 minutes; 5 wrong in a row per account, then 15 minutes without checks |
+| Exchanging a Google sign-in's code | 30 per address in 15 minutes |
 
 - "Account" is the email in the request, registered or not, so the limits don't show which emails are registered. A successful login, password reset or password change clears the account's wrong passwords.
 - The counters are in Redis. While Redis is down, nothing is limited, and everything else keeps working. Emailed codes always allow only 5 guesses.
@@ -275,6 +282,7 @@ These tell the owner that something happened to their account, with the time (UT
 | Two-factor authentication is on for your AuthCore account | It was turned on |
 | Two-factor authentication is off for your AuthCore account | It was turned off, by the user or by an admin |
 | A recovery code was used to sign in to AuthCore | A login with a recovery code |
+| Google sign-in was added to your AuthCore account | The first sign-in with Google to an existing account |
 
 - **Devices** are told apart by the `deviceId` cookie (HttpOnly, path `/api/v1/auth`, 90 days), which every login sets. It stays after a logout. Only its hash is stored (`known_devices`).
 - The first login of an account created less than a day ago sends nothing: it's the owner, right after signing up.
@@ -339,6 +347,24 @@ Optional for every user: an authenticator app (Google Authenticator, Authy, 1Pas
 - A password reset doesn't turn it off.
 
 **The secrets** are encrypted in the database (AES-256-GCM) with `TOTP_ENCRYPTION_KEY`, and recovery codes are stored as keyed hashes. **Keep the key:** if it changes or is lost, nobody's app codes or recovery codes work any more, and an admin has to turn two-factor authentication off for each of those users.
+
+### Signing in with Google
+
+Optional: on when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set (a "Web application" OAuth client in the Google Cloud console). Register this redirect URI there: `https://<api host>/api/v1/auth/oauth2/callback/google`.
+
+1. The web app sends the browser to `GET /api/v1/auth/oauth2/authorization/google` (a navigation, not `fetch`). The API sends it on to Google.
+2. Google sends it back to the API's callback, which sends it to the web app's page `FRONTEND_URL/login/google`, with `#code=...` in the fragment, or `#error=...`.
+3. That page sends the `code` to `POST /api/v1/auth/oauth2/exchange` (with `credentials: "include"`). The answer is a login's: the access token and the cookies, or `secondFactorRequired` and a `challenge` for a user with two-factor authentication.
+
+- The code works once, for one minute. It's in the fragment, so it's never sent to a server or in a `Referer`.
+- Between steps 1 and 2, the state, nonce and PKCE verifier are in an encrypted, HttpOnly cookie (`SameSite=Lax`, 5 minutes). The API keeps no server sessions, so any of several servers can take the callback.
+- A Google account is known by its id, not its email: it goes on signing in to the same account after an email change.
+- **The first time**, only an email Google says is verified is used:
+  - no account has it: a new one is made, verified, with the name from Google and no password anyone knows. "Forgot password" sets one, which is needed to change the email, turn on two-factor authentication or delete the account;
+  - a verified account has it: Google is linked to it, and the owner gets an email;
+  - an unverified account has it: it's taken over. Its password is replaced, since anyone could have registered it with that address.
+- Errors in the fragment: `EMAIL_NOT_VERIFIED`, `ACCOUNT_LOCKED`, `OTHER_GOOGLE_ACCOUNT` (the account with this email is linked to another Google account), `EMAIL_UNAVAILABLE` (an email change can still be undone to this address), `GOOGLE_SIGN_IN_FAILED` (cancelled at Google, or the request was too old or changed).
+- Only Google's ID token is used; Google's access token isn't kept.
 
 ### Admin Endpoints
 
