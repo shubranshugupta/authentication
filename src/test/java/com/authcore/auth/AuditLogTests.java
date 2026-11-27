@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -17,8 +18,10 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import com.authcore.auth.mfa.Totp;
 import com.authcore.auth.support.IntegrationTest;
 import com.authcore.auth.user.admin.AdminBootstrap;
+import com.jayway.jsonpath.JsonPath;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.Cookie;
@@ -193,6 +196,37 @@ class AuditLogTests extends IntegrationTest {
         auditLine(output, "EMAIL_CHANGE_UNDONE", userId, "");
         assertThat(auditLines(output)).noneMatch(line -> line.contains(email) || line.contains(newEmail)
                 || line.contains(NEW_PASSWORD));
+    }
+
+    @Test
+    void twoFactorLoginsAndSettingsAreRecordedWithoutCodes(CapturedOutput output) throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        int userId = user(email).getId();
+        String setup = mvc.perform(as(accessToken, post("/api/v1/users/me/2fa/setup"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"currentPassword\": \"%s\"}".formatted(PASSWORD)))
+                .andReturn().getResponse().getContentAsString();
+        byte[] secret = Totp.fromBase32(JsonPath.read(setup, "$.secret"));
+        String enableCode = Totp.code(secret, Totp.step(Instant.now()));
+        mvc.perform(as(accessToken, post("/api/v1/users/me/2fa/enable")).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"code\": \"%s\"}".formatted(enableCode))).andExpect(status().isOk());
+
+        String challenge = JsonPath.read(login(email, PASSWORD).andReturn().getResponse().getContentAsString(), "$.challenge");
+        String loginCode = Totp.code(secret, Totp.step(Instant.now()) + 1);
+        String wrong = loginCode.equals("000000") ? "111111" : "000000";
+        secondStep(challenge, wrong).andExpect(status().isUnauthorized());
+        secondStep(challenge, loginCode).andExpect(status().isOk());
+
+        auditLine(output, "TWO_FACTOR_ENABLED", userId, "");
+        auditLine(output, "SECOND_FACTOR_REQUIRED", userId, "");
+        auditLine(output, "LOGIN_FAILED", userId, "reason=WRONG_CODE");
+        auditLine(output, "LOGIN_SUCCEEDED", userId, "secondFactor=APP");
+        assertThat(auditLines(output)).noneMatch(line -> line.contains(email) || line.contains(loginCode)
+                || line.contains(enableCode) || line.contains(challenge));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions secondStep(String challenge, String code) throws Exception {
+        return postJson("/api/v1/auth/login/2fa", "{\"challenge\": \"%s\", \"code\": \"%s\"}".formatted(challenge, code));
     }
 
     // ---- admins --------------------------------------------------------------------

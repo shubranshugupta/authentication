@@ -1,5 +1,7 @@
 package com.authcore.auth.auth;
 
+import java.util.Optional;
+
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,7 +17,11 @@ import com.authcore.auth.audit.AuditEvent;
 import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
+import com.authcore.auth.common.ErrorCode;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.mfa.LoginChallenges;
+import com.authcore.auth.mfa.TwoFactorService;
+import com.authcore.auth.mfa.TwoFactorStateException;
 import com.authcore.auth.notification.SecurityAlert;
 import com.authcore.auth.notification.SecurityNotifier;
 import com.authcore.auth.ratelimit.LoginThrottle;
@@ -63,6 +69,8 @@ public class AuthService {
     private final Reauthentication reauthentication;
     private final DeviceService devices;
     private final SecurityNotifier notifier;
+    private final TwoFactorService twoFactor;
+    private final LoginChallenges challenges;
 
     public void register(RegisterRequest request) {
         String email = EmailAddresses.normalize(request.getEmail());
@@ -109,18 +117,73 @@ public class AuthService {
         LoginDetails user = checkPassword(normalized, password, client);
         loginThrottle.succeeded(normalized, client.ip());
 
-        SessionTokens session = sessions.open(user.getId(), user.getTokenVersion(), client)
+        if (twoFactor.isEnabled(user.getId())) {
+            audit.record(AuditEvent.SECOND_FACTOR_REQUIRED, user.getId());
+            return LoginResult.secondFactorRequired(challenges.issue(user.getId(), user.getTokenVersion()));
+        }
+        return openSession(user.getId(), user.getTokenVersion(), client, deviceId, null);
+    }
+
+    /**
+     * The second step of a login with two-factor authentication: the code from the app, or a
+     * recovery code.
+     *
+     * @param challenge what the first step returned
+     * @throws TwoFactorStateException  if the challenge expired, or the account changed since
+     *                                  ({@code TWO_FACTOR_LOGIN_EXPIRED}: log in again)
+     * @throws BadCredentialsException  if the code is wrong
+     * @throws TooManyRequestsException after too many wrong codes
+     */
+    public LoginResult completeLogin(String challenge, String code, ClientInfo client, @Nullable String deviceId) {
+        LoginChallenges.Challenge login = challenges.parse(challenge).orElseThrow(SecondFactor::expired);
+        Optional<TwoFactorService.Method> method;
+        try {
+            method = twoFactor.checkLogin(login.userId(), login.tokenVersion(), code);
+        } catch (InvalidCodeException e) {
+            audit.record(AuditEvent.LOGIN_FAILED, login.userId(), "reason", "WRONG_CODE");
+            throw new BadCredentialsException("Bad credentials", e);
+        } catch (TooManyRequestsException e) {
+            audit.record(AuditEvent.LOGIN_FAILED, login.userId(), "reason", "CODE_RATE_LIMITED");
+            throw e;
+        }
+        if (method.isEmpty()) {
+            audit.record(AuditEvent.LOGIN_FAILED, login.userId(), "reason", "EXPIRED");
+            throw SecondFactor.expired();
+        }
+        LoginResult result = openSession(login.userId(), login.tokenVersion(), client, deviceId, method.get());
+        if (method.get() == TwoFactorService.Method.RECOVERY_CODE)
+            notifier.send(login.userId(), SecurityAlert.RECOVERY_CODE_USED, client);
+        return result;
+    }
+
+    /**
+     * @param secondFactor how the code was given; null for a user without two-factor authentication
+     */
+    private LoginResult openSession(Integer userId, int tokenVersion, ClientInfo client, @Nullable String deviceId,
+            TwoFactorService.@Nullable Method secondFactor) {
+        SessionTokens session = sessions.open(userId, tokenVersion, client)
                 // The account was deleted, or its password changed, a moment ago.
                 .orElseThrow(() -> {
-                    loginFailed(normalized, "ACCOUNT_CHANGED");
+                    audit.record(AuditEvent.LOGIN_FAILED, userId, "reason", "ACCOUNT_CHANGED");
                     return new BadCredentialsException("Bad credentials");
                 });
         DeviceCheck device = devices.remember(session.userId(), deviceId);
-        audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId(),
-                "newDevice", device.isNew());
+        if (secondFactor == null)
+            audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId(),
+                    "newDevice", device.isNew());
+        else
+            audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId(),
+                    "newDevice", device.isNew(), "secondFactor", secondFactor);
         if (device.isNew())
             notifier.send(session.userId(), SecurityAlert.NEW_DEVICE_LOGIN, client);
-        return new LoginResult(tokenPair(session), device.deviceId());
+        return new LoginResult(tokenPair(session), device.deviceId(), null);
+    }
+
+    private static final class SecondFactor {
+        static TwoFactorStateException expired() {
+            return new TwoFactorStateException(ErrorCode.TWO_FACTOR_LOGIN_EXPIRED,
+                    "The login has expired, or the account changed since. Log in again.");
+        }
     }
 
     private LoginDetails checkPassword(String email, String password, ClientInfo client) {

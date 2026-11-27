@@ -28,6 +28,10 @@ class ApiDocsTests extends IntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/users/me/email'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/users/me/email/confirm'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/email-change/undo'].post.security", empty()))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/login/2fa'].post.security", empty()))
+                .andExpect(jsonPath("$.paths['/api/v1/users/me/2fa/setup'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/users/me/2fa/enable'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/admin/users/{id}/2fa/disable'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/admin/users/{id}/role'].put").exists())
                 // The login needs no token; the others do (the default).
                 .andExpect(jsonPath("$.paths['/api/v1/auth/login'].post.security", empty()))
