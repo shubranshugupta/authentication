@@ -112,6 +112,12 @@
 			<artifactId>jjwt-jackson</artifactId>
 			<version>${jjwt.version}</version>
 		</dependency>
+		<!-- Argon2id password hashes (Spring Security's Argon2PasswordEncoder needs it). -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.84</version>
+		</dependency>
 		<!-- Social login with Google (F5). Off unless GOOGLE_CLIENT_ID is set. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

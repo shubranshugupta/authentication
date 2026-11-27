@@ -8,7 +8,6 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.authcore.auth.user.UserRepository;
@@ -20,10 +19,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthenticationConfig {
     private final UserRepository userRepository;
+    private final PasswordUpgrade passwordUpgrade;
 
+    /** Argon2id for new hashes; bcrypt ones from before still match (PasswordHashing). */
     @Bean
     PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return PasswordHashing.encoder();
     }
 
     @Bean
@@ -36,6 +37,8 @@ public class AuthenticationConfig {
         });
         provider.setPostAuthenticationChecks(new AccountStatusUserDetailsChecker());
         provider.setPasswordEncoder(passwordEncoder());
+        // After a right password: an old bcrypt hash is replaced with an Argon2id one.
+        provider.setUserDetailsPasswordService(passwordUpgrade);
 
         return provider;
     }

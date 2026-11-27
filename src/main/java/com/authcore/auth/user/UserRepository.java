@@ -22,4 +22,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id in :ids order by u.id")
     List<User> lockAll(Collection<Integer> ids);
+
+    /** Whether any password hash is from before Argon2id (PasswordHashing). */
+    @Query("select count(u) > 0 from User u where u.password not like '{argon2}%'")
+    boolean anyOldPasswordHashes();
 }
