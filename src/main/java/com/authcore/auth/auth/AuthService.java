@@ -66,7 +66,8 @@ public class AuthService {
 
     public void register(RegisterRequest request) {
         String email = EmailAddresses.normalize(request.getEmail());
-        if (userRepository.findByEmail(email).isPresent())
+        // Or an account whose email was changed can still get it back (EmailChangeService).
+        if (userRepository.findByEmail(email).isPresent() || tokens.isReservedForUndo(email))
             throw new UserAlreadyExistsException(email + " already exists");
 
         String passwordHash = passwordEncoder.encode(request.getPassword());

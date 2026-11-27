@@ -18,6 +18,10 @@ public enum AuditEvent {
     PASSWORD_RESET,
     /** By the logged-in user, who stays logged in on this session ("sessionId"). All other sessions ended. */
     PASSWORD_CHANGED,
+    /** The user confirmed a new email with the code sent to it. Neither address is logged. */
+    EMAIL_CHANGED,
+    /** The link sent to the old address changed the email back and set a new password. All sessions ended. */
+    EMAIL_CHANGE_UNDONE,
     ACCOUNT_DELETED,
     /**
      * A password typed again, for an admin action or a password change, was wrong

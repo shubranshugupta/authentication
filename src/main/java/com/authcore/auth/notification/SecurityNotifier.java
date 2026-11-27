@@ -45,11 +45,16 @@ public class SecurityNotifier {
         vars.put("heading", alert.heading);
         vars.put("message", alert.message);
         vars.put("advice", alert.advice);
-        vars.put("when", WHEN.format(Instant.now()));
-        vars.put("ip", client.ip());
-        // Whatever the client calls itself: the template escapes it.
-        vars.put("device", client.device() == null || client.device().isBlank() ? "Unknown" : client.device());
+        vars.putAll(whenAndWhere(client));
         vars.put("frontendUrl", properties.getFrontendUrl());
         events.publishEvent(new EmailRequested(user.getEmail(), alert.subject, TEMPLATE, vars));
+    }
+
+    /** "when", "ip" and "device", for a template that shows them like the security emails. */
+    public static Map<String, Object> whenAndWhere(ClientInfo client) {
+        return Map.of("when", WHEN.format(Instant.now()),
+                "ip", client.ip(),
+                // Whatever the client calls itself: the template escapes it.
+                "device", client.device() == null || client.device().isBlank() ? "Unknown" : client.device());
     }
 }

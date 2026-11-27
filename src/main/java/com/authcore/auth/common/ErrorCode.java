@@ -38,6 +38,7 @@ public enum ErrorCode {
     // users and sessions
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "User not found"),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "User already exists"),
+    EMAIL_CHANGE_REFUSED(HttpStatus.CONFLICT, "The email can't be changed"),
     ADMIN_ACTION_REFUSED(HttpStatus.CONFLICT, "This can't be done to this user"),
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "Session not found"),
 

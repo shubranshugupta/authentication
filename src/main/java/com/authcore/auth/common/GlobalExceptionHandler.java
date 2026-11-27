@@ -40,6 +40,7 @@ import com.authcore.auth.token.TokenAlreadyExistsException;
 import com.authcore.auth.user.admin.AdminActionRefusedException;
 import com.authcore.auth.user.UserAlreadyExistsException;
 import com.authcore.auth.user.UserNotFoundException;
+import com.authcore.auth.user.account.EmailChangeRefusedException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -112,6 +113,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(UserAlreadyExistsException e) {
         return problem(ErrorCode.USER_ALREADY_EXISTS, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(EmailChangeRefusedException e) {
+        return problem(ErrorCode.EMAIL_CHANGE_REFUSED, e.getMessage());
     }
 
     @ExceptionHandler

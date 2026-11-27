@@ -33,12 +33,15 @@ public enum RateLimit {
     RESET_EMAIL_PER_IP(20, Duration.ofHours(1)),
     RESET_EMAIL_PER_ACCOUNT(10, Duration.ofHours(1)),
     DELETION_EMAIL_PER_USER(10, Duration.ofHours(1)),
+    // Codes to an address the user chooses: limited, so that it can't be used to send mail to anybody.
+    EMAIL_CHANGE_EMAIL_PER_USER(10, Duration.ofHours(1)),
 
     // Guesses at codes and links, on top of the 5 per code (C1). The one per account keeps a
     // single address from using up every code of somebody else.
     VERIFICATION_CONFIRM_PER_IP(30, Duration.ofMinutes(15)),
     RESET_CONFIRM_PER_IP(30, Duration.ofMinutes(15)),
-    RESET_CONFIRM_PER_IP_AND_ACCOUNT(10, Duration.ofHours(1));
+    RESET_CONFIRM_PER_IP_AND_ACCOUNT(10, Duration.ofHours(1)),
+    EMAIL_CHANGE_UNDO_PER_IP(30, Duration.ofMinutes(15));
 
     private static final int IPV6_NETWORK_BYTES = 8;
 

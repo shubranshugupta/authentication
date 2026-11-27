@@ -174,6 +174,27 @@ class AuditLogTests extends IntegrationTest {
                 || line.contains(PASSWORD) || line.contains(WRONG));
     }
 
+    @Test
+    void emailChangesAndUndosAreRecordedWithoutTheAddresses(CapturedOutput output) throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        int userId = user(email).getId();
+        String newEmail = uniqueEmail();
+
+        mvc.perform(as(accessToken, post("/api/v1/users/me/email")).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\": \"%s\", \"newEmail\": \"%s\"}".formatted(PASSWORD, newEmail)))
+                .andExpect(status().isOk());
+        mvc.perform(as(accessToken, post("/api/v1/users/me/email/confirm")).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"otp\": \"%s\"}".formatted(emailChangeOtp(newEmail)))).andExpect(status().isOk());
+        postJson("/api/v1/auth/email-change/undo", "{\"token\": \"%s\", \"password\": \"%s\"}"
+                .formatted(undoEmailChangeToken(email), NEW_PASSWORD)).andExpect(status().isOk());
+
+        auditLine(output, "EMAIL_CHANGED", userId, "");
+        auditLine(output, "EMAIL_CHANGE_UNDONE", userId, "");
+        assertThat(auditLines(output)).noneMatch(line -> line.contains(email) || line.contains(newEmail)
+                || line.contains(NEW_PASSWORD));
+    }
+
     // ---- admins --------------------------------------------------------------------
 
     @Test

@@ -18,6 +18,7 @@ import com.authcore.auth.ratelimit.RateLimit;
 import com.authcore.auth.ratelimit.RateLimiter;
 import com.authcore.auth.session.ClientInfo;
 import com.authcore.auth.session.DeviceService;
+import com.authcore.auth.user.account.EmailChangeService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +29,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping(AuthController.PATH)
 @RequiredArgsConstructor
-@Tag(name = "Auth", description = "Registration, login, refresh, logout, email verification and password reset")
+@Tag(name = "Auth", description = "Registration, login, refresh, logout, email verification, password reset and undoing an email change")
 @SecurityRequirements // no access token needed
 public class AuthController {
     // Also the path of the refresh cookie: browsers only send it to paths under this one.
@@ -45,6 +46,7 @@ public class AuthController {
     private static final String RESET_REQUESTED = "If an account with this email exists, a password reset email has been sent.";
 
     private final AuthService authService;
+    private final EmailChangeService emailChangeService;
     private final RateLimiter rateLimiter;
     private final AuthConfigProperties authConfigProperties;
 
@@ -114,6 +116,18 @@ public class AuthController {
                 RateLimit.RESET_CONFIRM_PER_IP_AND_ACCOUNT.forIpAndAccount(ip, request.getEmail()));
         authService.resetPassword(request.getEmail(), request.getOtp(), request.getPassword(), ClientInfo.of(http));
         return message("Password reset successfully");
+    }
+
+    /**
+     * From the link sent to the old address after an email change: changes the email back,
+     * sets a new password and logs out every device. A POST, like email verification (H4).
+     */
+    @PostMapping("/email-change/undo")
+    public ResponseEntity<MsgResponse> undoEmailChange(@Valid @RequestBody UndoEmailChangeRequest request,
+            HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.EMAIL_CHANGE_UNDO_PER_IP.forIp(http.getRemoteAddr()));
+        emailChangeService.undo(request.token(), request.password(), ClientInfo.of(http));
+        return message("Your email was changed back and your password was reset. Every device was logged out.");
     }
 
     private ResponseEntity<AuthResponse> tokens(TokenPair tokens, ResponseCookie... more) {

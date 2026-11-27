@@ -26,10 +26,11 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/v1/users/me")
 @RequiredArgsConstructor
-@Tag(name = "My account", description = "The logged-in user's profile, password and account deletion")
+@Tag(name = "My account", description = "The logged-in user's profile, password, email and account deletion")
 public class UserController {
     private final UserService userService;
     private final AuthService authService;
+    private final EmailChangeService emailChangeService;
     private final RateLimiter rateLimiter;
 
     @GetMapping
@@ -54,6 +55,26 @@ public class UserController {
         String accessToken = authService.changePassword(me.id(), me.sessionId(), request.currentPassword(),
                 request.newPassword(), ClientInfo.of(http));
         return ResponseEntity.ok(AuthResponse.builder().accessToken(accessToken).build());
+    }
+
+    /** Needs the current password. Sends a code to the new address; nothing changes yet. */
+    @PostMapping("/email")
+    public ResponseEntity<MsgResponse> requestEmailChange(@AuthenticationPrincipal UserPrincipal me,
+            @Valid @RequestBody ChangeEmailRequest request, HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.EMAIL_CHANGE_EMAIL_PER_USER.forUser(me.id()));
+        emailChangeService.request(me.id(), request.currentPassword(), request.newEmail(), ClientInfo.of(http));
+        return message("A code was sent to the new address.");
+    }
+
+    /**
+     * Changes the email to the address the code was sent to. The old address gets a link
+     * that changes it back for 7 days. Every device stays logged in.
+     */
+    @PostMapping("/email/confirm")
+    public ResponseEntity<MsgResponse> confirmEmailChange(@AuthenticationPrincipal UserPrincipal me,
+            @Valid @RequestBody ConfirmEmailChangeRequest request, HttpServletRequest http) {
+        emailChangeService.confirm(me.id(), request.otp(), ClientInfo.of(http));
+        return message("Email changed.");
     }
 
     @PostMapping("/deletion")
