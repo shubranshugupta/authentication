@@ -16,15 +16,22 @@ public enum TokenPurpose {
     EMAIL_CHANGE(Duration.ofMinutes(15), null, "Confirm your new AuthCore email", "change_email_email"),
     /** Sent to the old address, which it changes the account back to. */
     EMAIL_CHANGE_UNDO(Duration.ofDays(7), "/undo-email-change", "Your AuthCore email was changed",
-            "email_changed_email");
+            "email_changed_email"),
+    /**
+     * Not emailed: after signing in with Google, the browser is sent to this page of the web
+     * app with it, and the app exchanges it for tokens. Short, since it's in a URL.
+     */
+    SOCIAL_LOGIN(Duration.ofMinutes(1), "/login/google", null, null);
 
     final Duration validFor;
-    /** The page of the web app the emailed link opens. Without one, the email shows a code to type in. */
+    /** The page of the web app the link opens. Without one, the email shows a code to type in. */
     final @Nullable String page;
-    final String emailSubject;
-    final String emailTemplate;
+    /** Null for one that isn't emailed. */
+    final @Nullable String emailSubject;
+    final @Nullable String emailTemplate;
 
-    TokenPurpose(Duration validFor, @Nullable String page, String emailSubject, String emailTemplate) {
+    TokenPurpose(Duration validFor, @Nullable String page, @Nullable String emailSubject,
+            @Nullable String emailTemplate) {
         this.validFor = validFor;
         this.page = page;
         this.emailSubject = emailSubject;

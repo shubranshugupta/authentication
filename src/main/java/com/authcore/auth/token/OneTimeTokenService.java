@@ -100,13 +100,31 @@ public class OneTimeTokenService {
 
     private void send(User user, @Nullable OneTimeToken token, TokenPurpose purpose, @Nullable String email,
             Map<String, Object> details, Instant now) {
+        String plain = store(user, token, purpose, email, now);
+        events.publishEvent(email(user, purpose, plain, email, details));
+    }
+
+    /**
+     * A new token that isn't emailed but handed to the caller, e.g. for the redirect after
+     * signing in with Google. It replaces the user's last one for this purpose.
+     *
+     * @param user locked
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public String issueUnsent(User user, TokenPurpose purpose) {
+        return store(user, tokenRepository.findByUserIdAndPurpose(user.getId(), purpose).orElse(null), purpose,
+                null, Instant.now());
+    }
+
+    /** @return the token itself, of which only the hash is saved */
+    private String store(User user, @Nullable OneTimeToken token, TokenPurpose purpose, @Nullable String email,
+            Instant now) {
         if (token == null)
             token = new OneTimeToken(user.getId(), purpose);
         String plain = purpose.isLink() ? randomLinkToken() : randomCode();
         token.issue(hasher.hash(purpose, purpose.isLink() ? null : user.getId(), plain), email, now);
         tokenRepository.save(token);
-
-        events.publishEvent(email(user, purpose, plain, email, details));
+        return plain;
     }
 
     /** Whether the user has an unused, unexpired code or link for this purpose. */
