@@ -1,7 +1,6 @@
 package com.authcore.auth.support;
 
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,7 +14,6 @@ import java.util.regex.Pattern;
 
 import javax.crypto.SecretKey;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 import org.mockito.invocation.Invocation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +26,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -46,7 +43,6 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.mail.Message;
 import jakarta.mail.Multipart;
 import jakarta.mail.Part;
-import jakarta.mail.Session;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.Cookie;
@@ -56,13 +52,13 @@ import jakarta.servlet.http.Cookie;
  * Redis (Testcontainers), called over HTTP through MockMvc.
  *
  * <p>Every subclass shares one Spring context, so the containers start once per run.
- * {@link JavaMailSender} is a mock: emails are captured, never sent. Tests read links and
+ * {@link JavaMailSender} is a mock (CapturedMailConfiguration): emails are captured, never sent. Tests read links and
  * codes from those emails, like a user would; the database only has hashes of them.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestcontainersConfiguration.class)
+@Import({ TestcontainersConfiguration.class, CapturedMailConfiguration.class })
 public abstract class IntegrationTest {
     protected static final String PASSWORD = "Str0ng-Passw0rd!";
 
@@ -77,16 +73,12 @@ public abstract class IntegrationTest {
     @Autowired
     protected JdbcTemplate jdbc;
 
-    @MockitoBean
+    /** A mock that captures the emails (CapturedMailConfiguration). */
+    @Autowired
     protected JavaMailSender mailSender;
 
     @Value("${auth.token.secret-key}")
     private String jwtSecret;
-
-    @BeforeEach
-    void stubMailSender() {
-        when(mailSender.createMimeMessage()).thenAnswer(invocation -> new MimeMessage((Session) null));
-    }
 
     // ---- users ---------------------------------------------------------------------
 

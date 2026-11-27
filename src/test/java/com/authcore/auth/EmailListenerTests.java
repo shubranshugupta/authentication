@@ -16,6 +16,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
@@ -41,6 +42,15 @@ class EmailListenerTests extends IntegrationTest {
 
     @Autowired
     private TransactionTemplate transaction;
+
+    /**
+     * Some tests here make sending fail or record the thread. The mail mock is shared by every
+     * test and Spring doesn't reset it, so this does; it keeps creating messages.
+     */
+    @AfterEach
+    void forgetTheStubs() {
+        Mockito.reset(mailSender);
+    }
 
     /**
      * C4: the template name used to be a field shared by every request, so overlapping
