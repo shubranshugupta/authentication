@@ -76,6 +76,25 @@ class CleanupTests extends IntegrationTest {
         assertThat(count("select count(*) from users where id in (" + ids + ")")).isEqualTo(250);
     }
 
+    // ---- devices -------------------------------------------------------------------
+
+    /** F5: a device unseen for 90 days counts as new anyway, so it isn't kept. */
+    @Test
+    void devicesUnseenFor90DaysAreDeletedAndTheOthersStay() throws Exception {
+        String email = uniqueEmail();
+        registerVerifiedUserAndLogin(email);
+        login(email, PASSWORD).andExpect(status().isOk()); // a second device (no cookie)
+        int userId = user(email).getId();
+        long old = jdbc.queryForObject("select min(id) from known_devices where user_id = ?", Long.class, userId);
+        jdbc.update("update known_devices set last_seen_at = utc_timestamp(6) - interval 90 day - interval 1 second"
+                + " where id = ?", old);
+
+        sessionCleanup.run();
+
+        assertThat(count("select count(*) from known_devices where user_id = ?", userId)).isEqualTo(1);
+        assertThat(count("select count(*) from known_devices where id = ?", old)).isZero();
+    }
+
     // ---- refresh tokens ------------------------------------------------------------
 
     /** Used ones are kept for reuse detection, as long as a browser could still have them. */

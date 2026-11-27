@@ -215,14 +215,17 @@ public class SessionService {
                 Duration.between(now, session.getExpiresAt()));
     }
 
-    private static String randomToken() {
+    static String randomToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
         RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /** Without a key, unlike TokenHasher: a random token this long can't be guessed from its hash. */
-    private static String hash(String token) {
+    /**
+     * Without a key, unlike TokenHasher: a random token this long can't be guessed from its
+     * hash. Also for device ids (DeviceService).
+     */
+    static String hash(String token) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(UTF_8)));
         } catch (NoSuchAlgorithmException e) {

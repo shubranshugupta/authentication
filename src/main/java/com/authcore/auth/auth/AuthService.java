@@ -27,6 +27,8 @@ import com.authcore.auth.security.LoginDetails;
 import com.authcore.auth.security.PasswordConfirmation;
 import com.authcore.auth.security.Reauthentication;
 import com.authcore.auth.session.ClientInfo;
+import com.authcore.auth.session.DeviceService;
+import com.authcore.auth.session.DeviceService.DeviceCheck;
 import com.authcore.auth.session.SessionService;
 import com.authcore.auth.session.SessionTokens;
 import com.authcore.auth.token.InvalidCodeException;
@@ -59,6 +61,7 @@ public class AuthService {
     private final AuthConfigProperties authConfigProperties;
     private final AuditLog audit;
     private final Reauthentication reauthentication;
+    private final DeviceService devices;
     private final SecurityNotifier notifier;
 
     public void register(RegisterRequest request) {
@@ -90,7 +93,11 @@ public class AuthService {
         }
     }
 
-    public TokenPair login(String email, String password, ClientInfo client) {
+    /**
+     * @param deviceId the client's device id (a cookie), null if it has none
+     * @return the tokens, and the device id the client keeps from now on
+     */
+    public LoginResult login(String email, String password, ClientInfo client, @Nullable String deviceId) {
         String normalized = EmailAddresses.normalize(email);
         try {
             loginThrottle.beforeCheck(normalized, client.ip());
@@ -107,8 +114,12 @@ public class AuthService {
                     loginFailed(normalized, "ACCOUNT_CHANGED");
                     return new BadCredentialsException("Bad credentials");
                 });
-        audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId());
-        return tokenPair(session);
+        DeviceCheck device = devices.remember(session.userId(), deviceId);
+        audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId(),
+                "newDevice", device.isNew());
+        if (device.isNew())
+            notifier.send(session.userId(), SecurityAlert.NEW_DEVICE_LOGIN, client);
+        return new LoginResult(tokenPair(session), device.deviceId());
     }
 
     private LoginDetails checkPassword(String email, String password, ClientInfo client) {

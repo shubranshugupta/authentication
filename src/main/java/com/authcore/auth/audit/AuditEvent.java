@@ -2,7 +2,7 @@ package com.authcore.auth.audit;
 
 /** What the audit log records (F2). The names are part of the log format: don't rename them. */
 public enum AuditEvent {
-    /** With "sessionId". */
+    /** With "sessionId", and "newDevice" (true if the owner was emailed about it). */
     LOGIN_SUCCEEDED,
     /** With "reason": WRONG_PASSWORD, UNKNOWN_ACCOUNT, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED, RATE_LIMITED or ACCOUNT_CHANGED. */
     LOGIN_FAILED,

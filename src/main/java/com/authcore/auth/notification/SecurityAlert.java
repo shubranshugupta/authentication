@@ -5,6 +5,9 @@ package com.authcore.auth.notification;
  * off: they are how an owner finds out that somebody else has their password.
  */
 public enum SecurityAlert {
+    NEW_DEVICE_LOGIN("New sign-in to your AuthCore account", "New sign-in",
+            "Your account was just signed in to from a browser or app that hasn't been used with it before.",
+            "If this was you, there's nothing to do. If it wasn't, reset your password now with \"Forgot password\": that logs out every device."),
     PASSWORD_CHANGED("Your AuthCore password was changed", "Your password was changed",
             "The password of your account was changed by someone signed in to it. Every other device was logged out.",
             "If this was you, there's nothing to do. If it wasn't, reset your password now with \"Forgot password\": the code is sent to this email, and resetting logs out every device."),

@@ -47,6 +47,8 @@ import com.authcore.auth.security.WrongPasswordException;
 import com.authcore.auth.notification.SecurityAlert;
 import com.authcore.auth.notification.SecurityNotifier;
 import com.authcore.auth.session.ClientInfo;
+import com.authcore.auth.session.DeviceService;
+import com.authcore.auth.session.DeviceService.DeviceCheck;
 import com.authcore.auth.session.SessionService;
 import com.authcore.auth.session.SessionTokens;
 import com.authcore.auth.token.InvalidCodeException;
@@ -81,6 +83,8 @@ class AuthServiceTests {
     @Mock
     private Reauthentication reauthentication;
     @Mock
+    private DeviceService devices;
+    @Mock
     private SecurityNotifier notifier;
 
     private final AuthConfigProperties properties = new AuthConfigProperties();
@@ -90,7 +94,7 @@ class AuthServiceTests {
     void createService() {
         authService = new AuthService(userRepository, passwordEncoder, jwtService, sessions, manager,
                 loginThrottle, tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties,
-                new AuditLog(new SimpleMeterRegistry()), reauthentication, notifier);
+                new AuditLog(new SimpleMeterRegistry()), reauthentication, devices, notifier);
     }
 
     // ---- registration --------------------------------------------------------------
@@ -155,17 +159,39 @@ class AuthServiceTests {
         when(sessions.open(1, 5, CLIENT)).thenReturn(Optional.of(new SessionTokens(1, 5, 9L, "refresh", WEEK)));
         when(jwtService.generateToken(new AccessToken(1, 5, 9L))).thenReturn("access");
 
-        assertThat(authService.login("  Jane@Example.com ", "plain", CLIENT)).isEqualTo(new TokenPair("access", "refresh", WEEK));
+        when(devices.remember(1, "device")).thenReturn(new DeviceCheck("device", false));
+
+        assertThat(authService.login("  Jane@Example.com ", "plain", CLIENT, "device"))
+                .isEqualTo(new LoginResult(new TokenPair("access", "refresh", WEEK), "device"));
         verify(manager).authenticate(new UsernamePasswordAuthenticationToken(EMAIL, "plain"));
         verify(loginThrottle).beforeCheck(EMAIL, CLIENT.ip());
         verify(loginThrottle).succeeded(EMAIL, CLIENT.ip());
+        verifyNoInteractions(notifier);
+    }
+
+    @Test
+    void aLoginFromANewDeviceIsEmailedToTheOwner() {
+        passwordIsRight();
+        when(sessions.open(1, 5, CLIENT)).thenReturn(Optional.of(new SessionTokens(1, 5, 9L, "refresh", WEEK)));
+        when(devices.remember(1, null)).thenReturn(new DeviceCheck("new-device", true));
+
+        assertThat(authService.login(EMAIL, "plain", CLIENT, null).deviceId()).isEqualTo("new-device");
+        verify(notifier).send(1, SecurityAlert.NEW_DEVICE_LOGIN, CLIENT);
+    }
+
+    @Test
+    void aFailedLoginRemembersNoDeviceAndSendsNothing() {
+        when(manager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
+
+        assertThatThrownBy(() -> authService.login(EMAIL, "wrong", CLIENT, null)).isInstanceOf(BadCredentialsException.class);
+        verifyNoInteractions(devices, notifier);
     }
 
     @Test
     void loginWithBadCredentialsOpensNoSession() {
         when(manager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
 
-        assertThatThrownBy(() -> authService.login(EMAIL, "wrong", CLIENT)).isInstanceOf(BadCredentialsException.class);
+        assertThatThrownBy(() -> authService.login(EMAIL, "wrong", CLIENT, null)).isInstanceOf(BadCredentialsException.class);
         verifyNoInteractions(jwtService, sessions);
         // Only read, for the audit log's user id.
         verify(userRepository).findByEmail(EMAIL);
@@ -179,7 +205,7 @@ class AuthServiceTests {
     void afterTooManyWrongPasswordsNoneIsChecked() {
         doThrow(new TooManyRequestsException(WEEK)).when(loginThrottle).beforeCheck(EMAIL, CLIENT.ip());
 
-        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT)).isInstanceOf(TooManyRequestsException.class);
+        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT, null)).isInstanceOf(TooManyRequestsException.class);
         verifyNoInteractions(manager, sessions);
     }
 
@@ -188,7 +214,7 @@ class AuthServiceTests {
     void onlyWrongPasswordsCountAsGuesses() {
         when(manager.authenticate(any())).thenThrow(new InternalAuthenticationServiceException("database is down"));
 
-        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT)).isInstanceOf(InternalAuthenticationServiceException.class);
+        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT, null)).isInstanceOf(InternalAuthenticationServiceException.class);
         verify(loginThrottle).notAGuess(EMAIL, CLIENT.ip());
     }
 
@@ -197,7 +223,7 @@ class AuthServiceTests {
         passwordIsRight();
         when(sessions.open(1, 5, CLIENT)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT)).isInstanceOf(BadCredentialsException.class);
+        assertThatThrownBy(() -> authService.login(EMAIL, "plain", CLIENT, null)).isInstanceOf(BadCredentialsException.class);
         verifyNoInteractions(jwtService);
     }
 

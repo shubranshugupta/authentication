@@ -17,6 +17,7 @@ import com.authcore.auth.common.MsgResponse;
 import com.authcore.auth.ratelimit.RateLimit;
 import com.authcore.auth.ratelimit.RateLimiter;
 import com.authcore.auth.session.ClientInfo;
+import com.authcore.auth.session.DeviceService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +35,8 @@ public class AuthController {
     static final String PATH = "/api/v1/auth";
 
     private static final String REFRESH_COOKIE = "refreshToken";
+    // Kept across logouts: it says which browser this is, not who is logged in (F5).
+    private static final String DEVICE_COOKIE = "deviceId";
 
     // H2: these requests get the same answer whether or not the account exists,
     // is verified, or was sent a code a moment ago, so they can't be used to find
@@ -53,8 +56,10 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
-        return tokens(authService.login(request.getEmail(), request.getPassword(), ClientInfo.of(http)));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+            @CookieValue(name = DEVICE_COOKIE, required = false) @Nullable String deviceId, HttpServletRequest http) {
+        LoginResult login = authService.login(request.getEmail(), request.getPassword(), ClientInfo.of(http), deviceId);
+        return tokens(login.tokens(), cookie(DEVICE_COOKIE, login.deviceId(), DeviceService.REMEMBERED_FOR));
     }
 
     @PostMapping("/refresh")
@@ -111,8 +116,10 @@ public class AuthController {
         return message("Password reset successfully");
     }
 
-    private ResponseEntity<AuthResponse> tokens(TokenPair tokens) {
+    private ResponseEntity<AuthResponse> tokens(TokenPair tokens, ResponseCookie... more) {
         ResponseEntity.BodyBuilder response = ResponseEntity.ok();
+        for (ResponseCookie cookie : more)
+            response.header(HttpHeaders.SET_COOKIE, cookie.toString());
         if (tokens.refreshToken() != null)
             response.header(HttpHeaders.SET_COOKIE,
                     refreshCookie(tokens.refreshToken(), tokens.refreshValidFor()).toString());
@@ -120,8 +127,12 @@ public class AuthController {
     }
 
     private ResponseCookie refreshCookie(String refreshToken, Duration maxAge) {
+        return cookie(REFRESH_COOKIE, refreshToken, maxAge);
+    }
+
+    private ResponseCookie cookie(String name, String value, Duration maxAge) {
         AuthConfigProperties.CookieConfigProperties cookie = authConfigProperties.getCookie();
-        return ResponseCookie.from(REFRESH_COOKIE, refreshToken)
+        return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(cookie.isSecure())
                 .sameSite(cookie.getSameSite())
