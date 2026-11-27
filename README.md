@@ -4,7 +4,7 @@ This project is a comprehensive authentication system built using Spring Boot. I
 
 ## Features
 
-- JWT Authentication: Short-lived access tokens (JWT, 15 minutes) that stop working at once after a logout or a password reset.
+- JWT Authentication: Short-lived access tokens (JWT, 15 minutes) that stop working at once after a logout, a password reset or a password change.
 - Sessions: One session per device, with refresh tokens that work once and are stored only as hashes. Users can list their sessions and log out of them.
 - Rate Limiting: Limits on wrong passwords, code guesses, registrations and emails.
 - Role-Based Access Control: Different roles for users to manage access to various parts of the application.
@@ -129,7 +129,7 @@ Besides the usual JVM, HTTP and database pool metrics, the app counts:
 
 - Every log line of a request has its trace id. A `500` answer names it (`"traceId"`), so its details can be found in the log.
 - In `prod`, every line is a JSON object ([Elastic Common Schema](https://www.elastic.co/guide/en/ecs/current/index.html)), for a log collector such as CloudWatch, Loki or Elasticsearch.
-- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
+- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
 
 ### Cleanup
 
@@ -175,7 +175,7 @@ Packages under `com.authcore.auth` are grouped by feature:
 |---|---|
 | `auth` | registration, login, email verification, password reset |
 | `user` | the user entity, roles, and the user repository |
-| `user.account` | a user's own account: profile, account deletion (`/api/v1/users/me`) |
+| `user.account` | a user's own account: profile, password change, account deletion (`/api/v1/users/me`) |
 | `user.admin` | the admin API (`/api/v1/admin/users`), and the first admins from `AUTH_ADMIN_EMAILS` |
 | `token` | the codes and links sent by email |
 | `session` | sessions and refresh tokens, logout |
@@ -208,6 +208,7 @@ These need the access token: `Authorization: Bearer <token>`.
 |---|---|---|
 | `GET /api/v1/users/me` | | Returns the profile |
 | `PATCH /api/v1/users/me` | `firstName`, `lastName` (both optional) | Changes what is given. An empty `lastName` removes it |
+| `PUT /api/v1/users/me/password` | `currentPassword`, `newPassword` | Changes the password and logs out of all other devices. Returns a new `accessToken` for this device (the old one stops working); the refresh cookie stays the same |
 | `GET /api/v1/users/me/sessions` | | Lists where the user is logged in |
 | `DELETE /api/v1/users/me/sessions/{id}` | | Logs that device out |
 | `DELETE /api/v1/users/me/sessions` | | Logs out of all devices, this one too |
@@ -221,6 +222,7 @@ These need the access token: `Authorization: Bearer <token>`.
 - The **refresh token** is in an HttpOnly cookie and works once: every refresh sets a new one. If a used one shows up again, somebody has a copy of it, so all of the user's sessions end and they have to log in again.
 - Two tabs may refresh at the same moment with the same cookie: for 10 seconds, the replaced token still returns an access token (but no new cookie).
 - A password reset, "log out of all devices", and an admin locking the account end every session and make every access token stop working.
+- A password change ends every *other* session. Every access token stops working, so the answer has a new one for this session.
 - The endpoints under `/api/v1/auth` ignore the `Authorization` header, so an expired access token doesn't get in the way of refreshing it.
 
 ### Rate Limits
@@ -229,14 +231,14 @@ Beyond a limit, the answer is `429` with the code `TOO_MANY_REQUESTS` and a `Ret
 
 | What | Limit |
 |---|---|
-| Wrong passwords (at login, and for admin actions) | 5 per account from one address in 15 minutes; 50 per account in an hour; 50 per address in 15 minutes |
+| Wrong passwords (at login, for a password change, and for admin actions) | 5 per account from one address in 15 minutes; 50 per account in an hour; 50 per address in 15 minutes |
 | Registrations | 20 per address in an hour |
 | Verification emails, password reset emails | 20 per address and 10 per account in an hour, each |
 | Deletion emails | 10 per user in an hour |
 | Confirming a verification link | 30 per address in 15 minutes |
 | Confirming a password reset | 30 per address in 15 minutes; 10 per account from one address in an hour |
 
-- "Account" is the email in the request, registered or not, so the limits don't show which emails are registered. A successful login or password reset clears the account's wrong passwords.
+- "Account" is the email in the request, registered or not, so the limits don't show which emails are registered. A successful login, password reset or password change clears the account's wrong passwords.
 - The counters are in Redis. While Redis is down, nothing is limited, and everything else keeps working. Emailed codes always allow only 5 guesses.
 - **Behind a reverse proxy, set `FORWARD_HEADERS_STRATEGY=native`**, or all users share the limits of the proxy's address. Without a proxy keep the default (`none`), or clients could make up their address.
 - Locked out while testing? `docker compose exec redis redis-cli flushdb` clears the counters.
@@ -260,7 +262,7 @@ Beyond a limit, the answer is `429` with the code `TOO_MANY_REQUESTS` and a `Ret
 
 ### Input Rules
 
-- **Passwords** (registration and reset): at least 12 characters and at most 72 bytes. bcrypt ignores anything after 72 bytes; accented letters and emoji take 2–4 bytes each.
+- **Passwords** (registration, reset and change): at least 12 characters and at most 72 bytes. bcrypt ignores anything after 72 bytes; accented letters and emoji take 2–4 bytes each.
 - **Emails** are trimmed and lowercased, so `Jane@Example.com` and `jane@example.com` are the same account.
 - **Invalid input** returns `400` with an `errors` object that maps each field to its problem, for example `{"password": "must be at least 12 characters"}`.
 
@@ -308,7 +310,7 @@ Every error is a `ProblemDetail` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9
 |---|---|
 | 400 | `INVALID_INPUT` (with `errors`), `MALFORMED_BODY`, `MISSING_PARAMETER`, `INVALID_PARAMETER`, `MISSING_COOKIE`, `INVALID_CODE` (a code or link is wrong, expired or used), `BAD_REQUEST` |
 | 401 | `AUTHENTICATION_REQUIRED` (no token), `INVALID_TOKEN`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` |
-| 403 | `ACCOUNT_DISABLED` (email not verified), `ACCOUNT_LOCKED` (by an admin), `ACCESS_DENIED`, `WRONG_PASSWORD` (an admin action's password) |
+| 403 | `ACCOUNT_DISABLED` (email not verified), `ACCOUNT_LOCKED` (by an admin), `ACCESS_DENIED`, `WRONG_PASSWORD` (the current password of a password change, or an admin action's password) |
 | 404 | `NOT_FOUND`, `USER_NOT_FOUND`, `SESSION_NOT_FOUND` |
 | 405, 406, 415 | `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
 | 409 | `USER_ALREADY_EXISTS`, `TOKEN_ALREADY_EXISTS` (a code was sent less than a minute ago), `ADMIN_ACTION_REFUSED` |
