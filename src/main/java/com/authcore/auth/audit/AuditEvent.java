@@ -3,18 +3,26 @@ package com.authcore.auth.audit;
 /** What the audit log records (F2). The names are part of the log format: don't rename them. */
 public enum AuditEvent {
     /**
-     * With "sessionId", "newDevice" (true if the owner was emailed about it), and for a user
-     * with two-factor authentication "secondFactor" (APP or RECOVERY_CODE).
+     * With "sessionId", "newDevice" (true if the owner was emailed about it), for a user with
+     * two-factor authentication "secondFactor" (APP or RECOVERY_CODE), and "via" GOOGLE for a
+     * sign-in with Google.
      */
     LOGIN_SUCCEEDED,
     /**
      * With "reason": WRONG_PASSWORD, UNKNOWN_ACCOUNT, EMAIL_NOT_VERIFIED, ACCOUNT_LOCKED,
-     * RATE_LIMITED, ACCOUNT_CHANGED, or at the second step WRONG_CODE, CODE_RATE_LIMITED or
-     * EXPIRED.
+     * RATE_LIMITED, ACCOUNT_CHANGED, at the second step WRONG_CODE, CODE_RATE_LIMITED or
+     * EXPIRED, or with "via" GOOGLE one of SocialLoginException's reasons.
      */
     LOGIN_FAILED,
-    /** The password was right; the login waits for the code from the app. */
+    /** The password (or Google) was right; the login waits for the code from the app ("via"). */
     SECOND_FACTOR_REQUIRED,
+    /** A new account made by signing in with Google. */
+    GOOGLE_SIGN_UP,
+    /**
+     * Google was linked to the account with its email; "unverifiedAccount" if that account
+     * was never verified and was taken over.
+     */
+    GOOGLE_LINKED,
     TWO_FACTOR_ENABLED,
     /** By the user, or by the admin "by". */
     TWO_FACTOR_DISABLED,

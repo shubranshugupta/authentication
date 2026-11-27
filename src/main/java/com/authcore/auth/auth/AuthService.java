@@ -1,5 +1,7 @@
 package com.authcore.auth.auth;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.jspecify.annotations.Nullable;
@@ -121,7 +123,7 @@ public class AuthService {
             audit.record(AuditEvent.SECOND_FACTOR_REQUIRED, user.getId());
             return LoginResult.secondFactorRequired(challenges.issue(user.getId(), user.getTokenVersion()));
         }
-        return openSession(user.getId(), user.getTokenVersion(), client, deviceId, null);
+        return openSession(user.getId(), user.getTokenVersion(), client, deviceId);
     }
 
     /**
@@ -150,17 +152,35 @@ public class AuthService {
             audit.record(AuditEvent.LOGIN_FAILED, login.userId(), "reason", "EXPIRED");
             throw SecondFactor.expired();
         }
-        LoginResult result = openSession(login.userId(), login.tokenVersion(), client, deviceId, method.get());
+        LoginResult result = openSession(login.userId(), login.tokenVersion(), client, deviceId, "secondFactor",
+                method.get());
         if (method.get() == TwoFactorService.Method.RECOVERY_CODE)
             notifier.send(login.userId(), SecurityAlert.RECOVERY_CODE_USED, client);
         return result;
     }
 
     /**
-     * @param secondFactor how the code was given; null for a user without two-factor authentication
+     * The second step of a sign-in with Google: the one-minute code the web app got in the
+     * redirect. Then, like after a password, the app's code if two-factor authentication is on.
+     *
+     * @throws InvalidCodeException if the code is wrong, used or expired: sign in again
+     */
+    public LoginResult completeSocialLogin(String code, ClientInfo client, @Nullable String deviceId) {
+        User user = transaction.run(() -> tokens.consumeLink(code, TokenPurpose.SOCIAL_LOGIN).orElse(null));
+        if (user == null)
+            throw new InvalidCodeException("The sign-in has expired, or was used already. Sign in with Google again.");
+        if (twoFactor.isEnabled(user.getId())) {
+            audit.record(AuditEvent.SECOND_FACTOR_REQUIRED, user.getId(), "via", "GOOGLE");
+            return LoginResult.secondFactorRequired(challenges.issue(user.getId(), user.getTokenVersion()));
+        }
+        return openSession(user.getId(), user.getTokenVersion(), client, deviceId, "via", "GOOGLE");
+    }
+
+    /**
+     * @param how for the audit log, e.g. "secondFactor" and how the code was given
      */
     private LoginResult openSession(Integer userId, int tokenVersion, ClientInfo client, @Nullable String deviceId,
-            TwoFactorService.@Nullable Method secondFactor) {
+            Object... how) {
         SessionTokens session = sessions.open(userId, tokenVersion, client)
                 // The account was deleted, or its password changed, a moment ago.
                 .orElseThrow(() -> {
@@ -168,12 +188,10 @@ public class AuthService {
                     return new BadCredentialsException("Bad credentials");
                 });
         DeviceCheck device = devices.remember(session.userId(), deviceId);
-        if (secondFactor == null)
-            audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId(),
-                    "newDevice", device.isNew());
-        else
-            audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId(),
-                    "newDevice", device.isNew(), "secondFactor", secondFactor);
+        List<Object> details = new ArrayList<>(
+                List.of("sessionId", session.sessionId(), "newDevice", device.isNew()));
+        details.addAll(List.of(how));
+        audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), details.toArray());
         if (device.isNew())
             notifier.send(session.userId(), SecurityAlert.NEW_DEVICE_LOGIN, client);
         return new LoginResult(tokenPair(session), device.deviceId(), null);

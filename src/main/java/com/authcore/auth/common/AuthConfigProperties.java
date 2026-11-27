@@ -71,6 +71,37 @@ public class AuthConfigProperties {
     private CookieConfigProperties cookie = new CookieConfigProperties();
     @Valid
     private TotpConfigProperties totp = new TotpConfigProperties();
+    @Valid
+    private GoogleConfigProperties google = new GoogleConfigProperties();
+
+    /**
+     * Signing in with Google (F5). Off unless a client id is set; then the secret is needed
+     * too. The redirect URI to register at Google is
+     * {@code https://<api host>/api/v1/auth/oauth2/callback/google}.
+     */
+    @Data
+    @NoArgsConstructor
+    public static class GoogleConfigProperties {
+        private String clientId;
+
+        @ToString.Exclude
+        private String clientSecret;
+
+        /**
+         * Another OpenID provider in Google's place, found through its discovery document:
+         * for tests. Empty for Google itself.
+         */
+        private String issuerUri;
+
+        public boolean isEnabled() {
+            return clientId != null && !clientId.isBlank();
+        }
+
+        @AssertTrue(message = "auth.google.client-secret (GOOGLE_CLIENT_SECRET) is needed with GOOGLE_CLIENT_ID")
+        public boolean isSecretGivenIfEnabled() {
+            return !isEnabled() || (clientSecret != null && !clientSecret.isBlank());
+        }
+    }
 
     /** Two-factor authentication with an authenticator app (F5). */
     @Data

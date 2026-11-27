@@ -142,6 +142,12 @@ auth:
         encryption-key: ${TOTP_ENCRYPTION_KEY}
         issuer: ${TOTP_ISSUER:AuthCore}
 
+    # Signing in with Google. Off while GOOGLE_CLIENT_ID is empty. At Google, register the
+    # redirect URI https://<api host>/api/v1/auth/oauth2/callback/google.
+    google:
+        client-id: ${GOOGLE_CLIENT_ID:}
+        client-secret: ${GOOGLE_CLIENT_SECRET:}
+
     # The sender of every email. MAIL_FROM must be an address your mail provider
     # accepts as a sender (for Amazon SES: a verified address or domain).
     mail:
