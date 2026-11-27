@@ -5,10 +5,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -59,6 +61,17 @@ public class OneTimeTokenService {
      */
     @Transactional
     public boolean issue(Integer userId, TokenPurpose purpose) {
+        return issue(userId, purpose, null);
+    }
+
+    /**
+     * Like {@link #issue(Integer, TokenPurpose)}, for another address than the account's.
+     *
+     * @param email where the email goes, and what the account's email becomes once the code
+     *              or link is used; null for the account's own address
+     */
+    @Transactional
+    public boolean issue(Integer userId, TokenPurpose purpose, @Nullable String email) {
         User user = userRepository.findAndLockById(userId).orElse(null);
         if (user == null)
             return false;
@@ -67,15 +80,56 @@ public class OneTimeTokenService {
         OneTimeToken token = tokenRepository.findByUserIdAndPurpose(userId, purpose).orElse(null);
         if (token != null && now.isBefore(token.getIssuedAt().plus(RESEND_COOLDOWN)))
             return false;
+        send(user, token, purpose, email, Map.of(), now);
+        return true;
+    }
 
+    /**
+     * Sends a new code or link at once, without the cooldown: for one the user didn't ask
+     * for, such as the link that undoes an email change. It must reach the old address
+     * however recently the last one was sent.
+     *
+     * @param user    locked
+     * @param details more values for the email template
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void issueNow(User user, TokenPurpose purpose, String email, Map<String, Object> details) {
+        send(user, tokenRepository.findByUserIdAndPurpose(user.getId(), purpose).orElse(null), purpose, email,
+                details, Instant.now());
+    }
+
+    private void send(User user, @Nullable OneTimeToken token, TokenPurpose purpose, @Nullable String email,
+            Map<String, Object> details, Instant now) {
         if (token == null)
-            token = new OneTimeToken(userId, purpose);
+            token = new OneTimeToken(user.getId(), purpose);
         String plain = purpose.isLink() ? randomLinkToken() : randomCode();
-        token.issue(hasher.hash(purpose, purpose.isLink() ? null : userId, plain), now);
+        token.issue(hasher.hash(purpose, purpose.isLink() ? null : user.getId(), plain), email, now);
         tokenRepository.save(token);
 
-        events.publishEvent(email(user, purpose, plain));
-        return true;
+        events.publishEvent(email(user, purpose, plain, email, details));
+    }
+
+    /** Whether the user has an unused, unexpired code or link for this purpose. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean hasUnused(Integer userId, TokenPurpose purpose) {
+        Instant now = Instant.now();
+        return tokenRepository.findByUserIdAndPurpose(userId, purpose)
+                .filter(token -> token.getConsumedAt() == null && now.isBefore(token.getExpiresAt()))
+                .isPresent();
+    }
+
+    /**
+     * Whether an unused undo link can still change some account's email back to this one.
+     * No other account may take the address meanwhile, or the link would stop working.
+     */
+    public boolean isReservedForUndo(String email) {
+        return tokenRepository.existsUnused(email, TokenPurpose.EMAIL_CHANGE_UNDO, Instant.now());
+    }
+
+    /** Makes the user's codes and links for these purposes unusable, e.g. once the email changed. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void revoke(Integer userId, TokenPurpose... purposes) {
+        tokenRepository.deleteByUserIdAndPurposeIn(userId, List.of(purposes));
     }
 
     /**
@@ -85,6 +139,12 @@ public class OneTimeTokenService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<User> consumeLink(String token, TokenPurpose purpose) {
+        return consumeLinkForEmail(token, purpose).map(Consumed::user);
+    }
+
+    /** Like {@link #consumeLink}, with the address the link was issued for. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<Consumed> consumeLinkForEmail(String token, TokenPurpose purpose) {
         String hash = hasher.hash(purpose, null, token);
         return tokenRepository.findUserId(hash, purpose)
                 .flatMap(userId -> consume(userId, purpose, hash, user -> true));
@@ -102,10 +162,17 @@ public class OneTimeTokenService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<User> consumeCode(Integer userId, String code, TokenPurpose purpose, Predicate<User> required) {
+        return consumeCodeForEmail(userId, code, purpose, required).map(Consumed::user);
+    }
+
+    /** Like {@link #consumeCode}, with the address the code was issued for. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<Consumed> consumeCodeForEmail(Integer userId, String code, TokenPurpose purpose,
+            Predicate<User> required) {
         return consume(userId, purpose, hasher.hash(purpose, userId, code), required);
     }
 
-    private Optional<User> consume(Integer userId, TokenPurpose purpose, String hash, Predicate<User> required) {
+    private Optional<Consumed> consume(Integer userId, TokenPurpose purpose, String hash, Predicate<User> required) {
         User user = userRepository.findAndLockById(userId).orElse(null);
         if (user == null)
             return Optional.empty();
@@ -118,20 +185,29 @@ public class OneTimeTokenService {
         // "&", not "&&": always check both, so the time taken doesn't say which was wrong.
         if (token.hasHash(hash) & required.test(user)) {
             token.consume(now);
-            return Optional.of(user);
+            return Optional.of(new Consumed(user, token.getEmail()));
         }
         token.countWrongAttempt();
         return Optional.empty();
     }
 
-    private EmailRequested email(User user, TokenPurpose purpose, String plain) {
-        Map<String, Object> vars = new HashMap<>(); // not Map.of: the last name may be null
+    private EmailRequested email(User user, TokenPurpose purpose, String plain, @Nullable String email,
+            Map<String, Object> details) {
+        Map<String, Object> vars = new HashMap<>(details); // not Map.of: the last name may be null
         vars.put("firstName", StringUtils.capitalize(user.getFirstName()));
         vars.put("lastName", StringUtils.capitalize(user.getLastName()));
         vars.put("token", purpose.isLink() ? link(purpose, plain) : plain);
         vars.put("validFor", purpose.validForText());
         vars.put("frontendUrl", properties.getFrontendUrl());
-        return new EmailRequested(user.getEmail(), purpose.emailSubject, purpose.emailTemplate, vars);
+        return new EmailRequested(email != null ? email : user.getEmail(), purpose.emailSubject,
+                purpose.emailTemplate, vars);
+    }
+
+    /**
+     * @param user  locked
+     * @param email the address the code or link was issued for; null for the account's own
+     */
+    public record Consumed(User user, @Nullable String email) {
     }
 
     /** The token alone: it says whose it is, and the email doesn't belong in a URL (H4). */
