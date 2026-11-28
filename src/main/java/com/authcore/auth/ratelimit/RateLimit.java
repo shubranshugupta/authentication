@@ -41,7 +41,10 @@ public enum RateLimit {
     VERIFICATION_CONFIRM_PER_IP(30, Duration.ofMinutes(15)),
     RESET_CONFIRM_PER_IP(30, Duration.ofMinutes(15)),
     RESET_CONFIRM_PER_IP_AND_ACCOUNT(10, Duration.ofHours(1)),
-    EMAIL_CHANGE_UNDO_PER_IP(30, Duration.ofMinutes(15));
+    EMAIL_CHANGE_UNDO_PER_IP(30, Duration.ofMinutes(15)),
+    // Codes from authenticator apps at login. Each account also allows only 5 wrong ones in a
+    // row, counted in the database (TwoFactorService).
+    SECOND_FACTOR_PER_IP(30, Duration.ofMinutes(15));
 
     private static final int IPV6_NETWORK_BYTES = 8;
 

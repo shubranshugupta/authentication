@@ -10,7 +10,8 @@ This project is a comprehensive authentication system built using Spring Boot. I
 - Role-Based Access Control: Different roles for users to manage access to various parts of the application.
 - Emailed Codes and Links: Verify an email, reset a password, change the email or delete an account. They are stored only as hashes, work once, expire, and stop working after 5 wrong guesses.
 - Change Email: The new address is confirmed with a code; the old one gets a link that changes it back for 7 days.
-- Security Emails: The owner is told about a login from a new device, a password change or reset, an email change, and a copied refresh token, with when and from where.
+- Two-Factor Authentication: Optional codes from an authenticator app (TOTP) at every login, with recovery codes. The secrets are encrypted.
+- Security Emails: The owner is told about a login from a new device, a password change or reset, an email change, two-factor authentication turned on or off, a used recovery code, and a copied refresh token, with when and from where.
 - Operations: Health checks and Prometheus metrics on a separate port, JSON logs with a trace id per request, an audit log of security events, OpenAPI documentation, a Docker image, and CI.
 
 ## Technologies Used
@@ -51,6 +52,8 @@ cp env.properties.example env.properties
 
 Then fill in `JWT_SECRET_KEY`: a base64 key of at least 32 bytes. Generate one with `openssl rand -base64 48`.
 
+And `TOTP_ENCRYPTION_KEY`, which encrypts the two-factor secrets: a base64 key of exactly 32 bytes. Generate one with `openssl rand -base64 32`, and keep it (see Two-Factor Authentication).
+
 The database, Redis and mail defaults already match `docker-compose.yml`. Any setting can also be given as an environment variable, which takes priority over the file.
 
 #### Start MySQL, Redis and Mailpit
@@ -76,7 +79,7 @@ NOTE: The application will start at `http://localhost:8080`. The API is describe
 | Profile | How it's selected | Settings come from |
 |---|---|---|
 | `dev` | the default | environment variables, then `./env.properties`, then defaults matching `docker-compose.yml`. SQL logging is on. |
-| `prod` | `SPRING_PROFILES_ACTIVE=prod` (the Docker image's default) | environment variables only. There are no defaults for hosts or credentials: `DB_HOST`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `FRONTEND_URL` must be set; if one is missing, the app doesn't start and names all the missing ones. Logs are JSON, and the API docs are off. |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod` (the Docker image's default) | environment variables only. There are no defaults for hosts or credentials: `DB_HOST`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `TOTP_ENCRYPTION_KEY`, `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `FRONTEND_URL` must be set; if one is missing, the app doesn't start and names all the missing ones. Logs are JSON, and the API docs are off. |
 
 ### Database Migrations
 
@@ -130,7 +133,7 @@ Besides the usual JVM, HTTP and database pool metrics, the app counts:
 
 - Every log line of a request has its trace id. A `500` answer names it (`"traceId"`), so its details can be found in the log.
 - In `prod`, every line is a JSON object ([Elastic Common Schema](https://www.elastic.co/guide/en/ecs/current/index.html)), for a log collector such as CloudWatch, Loki or Elasticsearch.
-- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `EMAIL_CHANGED`, `EMAIL_CHANGE_UNDONE`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
+- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `EMAIL_CHANGED`, `EMAIL_CHANGE_UNDONE`, `SECOND_FACTOR_REQUIRED`, `TWO_FACTOR_ENABLED`, `TWO_FACTOR_DISABLED`, `RECOVERY_CODES_RENEWED`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
 
 ### Cleanup
 
@@ -181,6 +184,7 @@ Packages under `com.authcore.auth` are grouped by feature:
 | `token` | the codes and links sent by email |
 | `session` | sessions and refresh tokens, logout |
 | `security` | Spring Security setup, access tokens (JWT) |
+| `mfa` | two-factor authentication: TOTP, recovery codes, the login's second step |
 | `ratelimit` | limits on logins, code guesses and emails |
 | `notification` | emails |
 | `audit` | the audit log |
@@ -195,7 +199,8 @@ Packages under `com.authcore.auth` are grouped by feature:
 | `POST /api/v1/auth/register` | `firstName`, `lastName` (optional), `email`, `password` | Creates the account and emails a verification link |
 | `POST /api/v1/auth/email-verification` | `email` | Emails a new verification link |
 | `POST /api/v1/auth/email-verification/confirm` | `token` | Verifies the email with the token from the link |
-| `POST /api/v1/auth/login` | `email`, `password` | Returns an access token, and sets the refresh token as a cookie |
+| `POST /api/v1/auth/login` | `email`, `password` | Returns an access token, and sets the refresh token as a cookie. With two-factor authentication, returns a `challenge` instead |
+| `POST /api/v1/auth/login/2fa` | `challenge`, `code` | The second step of a login with two-factor authentication: returns what a login returns |
 | `POST /api/v1/auth/refresh` | (refresh cookie) | Returns a new access token, and replaces the refresh cookie |
 | `POST /api/v1/auth/logout` | (refresh cookie) | Ends the session and deletes the cookie |
 | `POST /api/v1/auth/password-reset` | `email` | Emails a reset code |
@@ -213,6 +218,11 @@ These need the access token: `Authorization: Bearer <token>`.
 | `PUT /api/v1/users/me/password` | `currentPassword`, `newPassword` | Changes the password and logs out of all other devices. Returns a new `accessToken` for this device (the old one stops working); the refresh cookie stays the same |
 | `POST /api/v1/users/me/email` | `currentPassword`, `newEmail` | Emails a code to the new address. Nothing changes yet |
 | `POST /api/v1/users/me/email/confirm` | `otp` | Changes the email to the address the code was sent to. Every device stays logged in |
+| `GET /api/v1/users/me/2fa` | | Whether two-factor authentication is on, and how many recovery codes are left |
+| `POST /api/v1/users/me/2fa/setup` | `currentPassword` | Returns a new `secret` and `otpauthUri` for the app |
+| `POST /api/v1/users/me/2fa/enable` | `code` | Turns it on with the app's first code. Returns 10 `recoveryCodes` |
+| `POST /api/v1/users/me/2fa/disable` | `currentPassword`, `code` | Turns it off |
+| `POST /api/v1/users/me/2fa/recovery-codes` | `currentPassword`, `code` | Returns 10 new `recoveryCodes`; the old ones stop working |
 | `GET /api/v1/users/me/sessions` | | Lists where the user is logged in |
 | `DELETE /api/v1/users/me/sessions/{id}` | | Logs that device out |
 | `DELETE /api/v1/users/me/sessions` | | Logs out of all devices, this one too |
@@ -244,6 +254,7 @@ Beyond a limit, the answer is `429` with the code `TOO_MANY_REQUESTS` and a `Ret
 | Confirming a verification link | 30 per address in 15 minutes |
 | Confirming a password reset | 30 per address in 15 minutes; 10 per account from one address in an hour |
 | Undoing an email change | 30 per address in 15 minutes |
+| Two-factor codes at login | 30 per address in 15 minutes; 5 wrong in a row per account, then 15 minutes without checks |
 
 - "Account" is the email in the request, registered or not, so the limits don't show which emails are registered. A successful login, password reset or password change clears the account's wrong passwords.
 - The counters are in Redis. While Redis is down, nothing is limited, and everything else keeps working. Emailed codes always allow only 5 guesses.
@@ -261,6 +272,9 @@ These tell the owner that something happened to their account, with the time (UT
 | Your AuthCore password was reset | A password reset with an emailed code |
 | You were logged out of AuthCore everywhere | A used refresh token showed up again, so every session ended |
 | Your AuthCore email was changed | The email was changed (sent to the old address, with the undo link; see below) |
+| Two-factor authentication is on for your AuthCore account | It was turned on |
+| Two-factor authentication is off for your AuthCore account | It was turned off, by the user or by an admin |
+| A recovery code was used to sign in to AuthCore | A login with a recovery code |
 
 - **Devices** are told apart by the `deviceId` cookie (HttpOnly, path `/api/v1/auth`, 90 days), which every login sets. It stays after a logout. Only its hash is stored (`known_devices`).
 - The first login of an account created less than a day ago sends nothing: it's the owner, right after signing up.
@@ -299,6 +313,33 @@ While that link works, the email can't be changed again (`409 EMAIL_CHANGE_REFUS
 - **Emails** are trimmed and lowercased, so `Jane@Example.com` and `jane@example.com` are the same account.
 - **Invalid input** returns `400` with an `errors` object that maps each field to its problem, for example `{"password": "must be at least 12 characters"}`.
 
+### Two-Factor Authentication
+
+Optional for every user: an authenticator app (Google Authenticator, Authy, 1Password, ...) gives a 6-digit code every 30 seconds (TOTP, RFC 6238), and every login needs one after the password.
+
+**Turning it on**
+
+1. `POST /api/v1/users/me/2fa/setup` with the current password. The answer has the `secret` (to type into the app) and the `otpauthUri` (for the app to scan as a QR code; the frontend draws it). Nothing changes at login yet.
+2. `POST /api/v1/users/me/2fa/enable` with the first `code` the app shows. Two-factor authentication is on, and the answer has 10 **recovery codes** (`xxxxx-xxxxx`), shown this once. Each works once instead of a code from the app.
+
+**Logging in**
+
+1. `POST /api/v1/auth/login` with the email and password. Instead of tokens, the answer is `{"secondFactorRequired": true, "challenge": "..."}`, and no cookies are set.
+2. `POST /api/v1/auth/login/2fa` with the `challenge` and the `code` (from the app, or a recovery code). The answer is the same as a normal login's: the access token, and the refresh and device cookies.
+
+- The challenge lasts 5 minutes. A password change or reset, a lock, or "log out of all devices" meanwhile makes it useless (`401 TWO_FACTOR_LOGIN_EXPIRED`): log in again.
+- A wrong code is `401 INVALID_CREDENTIALS`, like a wrong password. After 5 wrong codes in a row, none is checked for 15 minutes (`429`). That limit is kept in the database, so it holds while Redis is down.
+- A code works once. The app's clock may be 30 seconds off either way.
+- Using a recovery code emails the owner.
+
+**Turning it off, new recovery codes**
+
+- `POST /api/v1/users/me/2fa/disable` and `POST /api/v1/users/me/2fa/recovery-codes` need the current password and a code (from the app, or a recovery code). New recovery codes replace the old ones.
+- A user who lost both their phone and their recovery codes asks an admin: `POST /api/v1/admin/users/{id}/2fa/disable` (see Admin Endpoints).
+- A password reset doesn't turn it off.
+
+**The secrets** are encrypted in the database (AES-256-GCM) with `TOTP_ENCRYPTION_KEY`, and recovery codes are stored as keyed hashes. **Keep the key:** if it changes or is lost, nobody's app codes or recovery codes work any more, and an admin has to turn two-factor authentication off for each of those users.
+
 ### Admin Endpoints
 
 These need an access token of a user with the `ADMIN` role (otherwise `403`; without a token, `401`).
@@ -312,6 +353,7 @@ The actions that change something also need the admin's own password in the body
 4. Unlock a user: `POST /api/v1/admin/users/{id}/unlock` with `{"password": "..."}`
 5. Log a user out of all devices: `POST /api/v1/admin/users/{id}/logout` with `{"password": "..."}`
 6. Promote or demote a user: `PUT /api/v1/admin/users/{id}/role` with `{"role": "ADMIN", "password": "..."}` or `{"role": "USER", "password": "..."}`
+7. Turn a user's two-factor authentication off: `POST /api/v1/admin/users/{id}/2fa/disable` with `{"password": "..."}`, for a user who lost both their phone and their recovery codes. Emails the user. Check who is asking first: this lets the password alone into the account.
 
 A wrong password returns `403 WRONG_PASSWORD` (not `401`: the access token is still fine). Wrong passwords count like wrong passwords at login, with the same limits. The responses never include password hashes or tokens. Admins can't lock or demote themselves (`409 ADMIN_ACTION_REFUSED`).
 
@@ -342,11 +384,11 @@ Every error is a `ProblemDetail` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9
 | Status | Codes |
 |---|---|
 | 400 | `INVALID_INPUT` (with `errors`), `MALFORMED_BODY`, `MISSING_PARAMETER`, `INVALID_PARAMETER`, `MISSING_COOKIE`, `INVALID_CODE` (a code or link is wrong, expired or used), `BAD_REQUEST` |
-| 401 | `AUTHENTICATION_REQUIRED` (no token), `INVALID_TOKEN`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` |
+| 401 | `AUTHENTICATION_REQUIRED` (no token), `INVALID_TOKEN`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS` (also a wrong two-factor code at login), `TWO_FACTOR_LOGIN_EXPIRED` (log in again) |
 | 403 | `ACCOUNT_DISABLED` (email not verified), `ACCOUNT_LOCKED` (by an admin), `ACCESS_DENIED`, `WRONG_PASSWORD` (the current password of a password change, or an admin action's password) |
 | 404 | `NOT_FOUND`, `USER_NOT_FOUND`, `SESSION_NOT_FOUND` |
 | 405, 406, 415 | `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
-| 409 | `USER_ALREADY_EXISTS`, `TOKEN_ALREADY_EXISTS` (a code was sent less than a minute ago), `ADMIN_ACTION_REFUSED` |
+| 409 | `USER_ALREADY_EXISTS`, `TOKEN_ALREADY_EXISTS` (a code was sent less than a minute ago), `ADMIN_ACTION_REFUSED`, `EMAIL_CHANGE_REFUSED`, `TWO_FACTOR_ALREADY_ENABLED`, `TWO_FACTOR_NOT_SET_UP`, `TWO_FACTOR_NOT_ENABLED` |
 | 429 | `TOO_MANY_REQUESTS` (see Rate Limits) |
 | 500 | `INTERNAL_ERROR`, with the request's `traceId`. The details are only in the server log, under that trace id. |
 

@@ -135,6 +135,13 @@ auth:
         secure: ${AUTH_COOKIE_SECURE:true}
         same-site: ${AUTH_COOKIE_SAME_SITE:Strict}
 
+    # Two-factor authentication with an authenticator app. The key encrypts every user's
+    # TOTP secret: base64 of exactly 32 bytes (openssl rand -base64 32). Keep it; if it
+    # changes, nobody's app codes work any more (recovery codes neither).
+    totp:
+        encryption-key: ${TOTP_ENCRYPTION_KEY}
+        issuer: ${TOTP_ISSUER:AuthCore}
+
     # The sender of every email. MAIL_FROM must be an address your mail provider
     # accepts as a sender (for Amazon SES: a verified address or domain).
     mail:

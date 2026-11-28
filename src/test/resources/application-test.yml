@@ -8,6 +8,9 @@ auth:
     token:
         # Test-only key (base64 of "test-only-jwt-signing-key-for-authcore-integration-tests").
         secret-key: dGVzdC1vbmx5LWp3dC1zaWduaW5nLWtleS1mb3ItYXV0aGNvcmUtaW50ZWdyYXRpb24tdGVzdHM=
+    totp:
+        # Test-only key (base64 of "test-only-totp-key-32-bytes-long").
+        encryption-key: dGVzdC1vbmx5LXRvdHAta2V5LTMyLWJ5dGVzLWxvbmc=
     # Off: tests that expire something on purpose must not see it deleted. CleanupTests
     # runs the jobs itself.
     cleanup:

@@ -72,6 +72,14 @@ public class AdminController {
         return ResponseEntity.ok(adminUserService.changeRole(confirmation(me, request.password(), http), id, request.role()));
     }
 
+    /** For a user who lost both their phone and their recovery codes. Emails the user. */
+    @PostMapping("/{id}/2fa/disable")
+    public ResponseEntity<AdminUserResponse> disableTwoFactor(@AuthenticationPrincipal UserPrincipal me,
+            @PathVariable int id, @Valid @RequestBody AdminPasswordRequest request, HttpServletRequest http) {
+        return ResponseEntity.ok(adminUserService.disableTwoFactor(confirmation(me, request.password(), http), id,
+                ClientInfo.of(http)));
+    }
+
     private static PasswordConfirmation confirmation(UserPrincipal me, String password, HttpServletRequest http) {
         return new PasswordConfirmation(me.id(), password, ClientInfo.of(http).ip());
     }

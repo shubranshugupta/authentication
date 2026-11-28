@@ -60,7 +60,25 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
             @CookieValue(name = DEVICE_COOKIE, required = false) @Nullable String deviceId, HttpServletRequest http) {
-        LoginResult login = authService.login(request.getEmail(), request.getPassword(), ClientInfo.of(http), deviceId);
+        return loggedIn(authService.login(request.getEmail(), request.getPassword(), ClientInfo.of(http), deviceId));
+    }
+
+    /**
+     * The second step of a login with two-factor authentication: the {@code challenge} from
+     * the first step, and the code from the app or a recovery code. A wrong code is
+     * {@code 401 INVALID_CREDENTIALS}, like a wrong password.
+     */
+    @PostMapping("/login/2fa")
+    public ResponseEntity<AuthResponse> completeLogin(@Valid @RequestBody SecondFactorRequest request,
+            @CookieValue(name = DEVICE_COOKIE, required = false) @Nullable String deviceId, HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.SECOND_FACTOR_PER_IP.forIp(http.getRemoteAddr()));
+        return loggedIn(authService.completeLogin(request.challenge(), request.code(), ClientInfo.of(http), deviceId));
+    }
+
+    private ResponseEntity<AuthResponse> loggedIn(LoginResult login) {
+        if (login.challenge() != null)
+            // No cookies yet: the device cookie comes with the session.
+            return ResponseEntity.ok(AuthResponse.secondFactorRequired(login.challenge()));
         return tokens(login.tokens(), cookie(DEVICE_COOKIE, login.deviceId(), DeviceService.REMEMBERED_FOR));
     }
 

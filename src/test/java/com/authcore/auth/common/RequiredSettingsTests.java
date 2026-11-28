@@ -59,7 +59,7 @@ class RequiredSettingsTests {
         assertThat(Binder.get(environment).bind(RequiredSettings.LIST, Bindable.listOf(String.class)).get())
                 .containsExactlyInAnyOrder("DB_HOST", "DB_DATABASE", "DB_USER", "DB_PASSWORD",
                         "REDIS_HOST", "REDIS_PASSWORD", "MAIL_HOST", "MAIL_USERNAME", "MAIL_PASSWORD",
-                        "MAIL_FROM", "JWT_SECRET_KEY", "FRONTEND_URL");
+                        "MAIL_FROM", "JWT_SECRET_KEY", "TOTP_ENCRYPTION_KEY", "FRONTEND_URL");
     }
 
     /** Registered in spring.factories: it runs before anything connects anywhere. */

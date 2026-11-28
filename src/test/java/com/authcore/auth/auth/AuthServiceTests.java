@@ -33,6 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.authcore.auth.common.AuthConfigProperties;
+import com.authcore.auth.common.ErrorCode;
 import com.authcore.auth.common.RetryingTransaction;
 import com.authcore.auth.ratelimit.LoginThrottle;
 import com.authcore.auth.ratelimit.TooManyRequestsException;
@@ -44,6 +45,9 @@ import com.authcore.auth.security.LoginDetails;
 import com.authcore.auth.security.PasswordConfirmation;
 import com.authcore.auth.security.Reauthentication;
 import com.authcore.auth.security.WrongPasswordException;
+import com.authcore.auth.mfa.LoginChallenges;
+import com.authcore.auth.mfa.TwoFactorService;
+import com.authcore.auth.mfa.TwoFactorStateException;
 import com.authcore.auth.notification.SecurityAlert;
 import com.authcore.auth.notification.SecurityNotifier;
 import com.authcore.auth.session.ClientInfo;
@@ -86,6 +90,10 @@ class AuthServiceTests {
     private DeviceService devices;
     @Mock
     private SecurityNotifier notifier;
+    @Mock
+    private TwoFactorService twoFactor;
+    @Mock
+    private LoginChallenges challenges;
 
     private final AuthConfigProperties properties = new AuthConfigProperties();
     private AuthService authService;
@@ -94,7 +102,7 @@ class AuthServiceTests {
     void createService() {
         authService = new AuthService(userRepository, passwordEncoder, jwtService, sessions, manager,
                 loginThrottle, tokens, new RetryingTransaction(TransactionOperations.withoutTransaction()), properties,
-                new AuditLog(new SimpleMeterRegistry()), reauthentication, devices, notifier);
+                new AuditLog(new SimpleMeterRegistry()), reauthentication, devices, notifier, twoFactor, challenges);
     }
 
     // ---- registration --------------------------------------------------------------
@@ -162,7 +170,7 @@ class AuthServiceTests {
         when(devices.remember(1, "device")).thenReturn(new DeviceCheck("device", false));
 
         assertThat(authService.login("  Jane@Example.com ", "plain", CLIENT, "device"))
-                .isEqualTo(new LoginResult(new TokenPair("access", "refresh", WEEK), "device"));
+                .isEqualTo(new LoginResult(new TokenPair("access", "refresh", WEEK), "device", null));
         verify(manager).authenticate(new UsernamePasswordAuthenticationToken(EMAIL, "plain"));
         verify(loginThrottle).beforeCheck(EMAIL, CLIENT.ip());
         verify(loginThrottle).succeeded(EMAIL, CLIENT.ip());
@@ -177,6 +185,69 @@ class AuthServiceTests {
 
         assertThat(authService.login(EMAIL, "plain", CLIENT, null).deviceId()).isEqualTo("new-device");
         verify(notifier).send(1, SecurityAlert.NEW_DEVICE_LOGIN, CLIENT);
+    }
+
+    // ---- two-factor authentication -------------------------------------------------
+
+    @Test
+    void withTwoFactorThePasswordOnlyGetsAChallenge() {
+        passwordIsRight();
+        when(twoFactor.isEnabled(1)).thenReturn(true);
+        when(challenges.issue(1, 5)).thenReturn("challenge");
+
+        LoginResult result = authService.login(EMAIL, "plain", CLIENT, "device");
+
+        assertThat(result).isEqualTo(new LoginResult(null, null, "challenge"));
+        verify(loginThrottle).succeeded(EMAIL, CLIENT.ip());
+        verifyNoInteractions(sessions, devices, notifier, jwtService);
+    }
+
+    @Test
+    void theRightCodeOpensTheSessionWithTheVersionThePasswordWasCheckedAt() {
+        when(challenges.parse("challenge")).thenReturn(Optional.of(new LoginChallenges.Challenge(1, 5)));
+        when(twoFactor.checkLogin(1, 5, "123456")).thenReturn(Optional.of(TwoFactorService.Method.APP));
+        when(sessions.open(1, 5, CLIENT)).thenReturn(Optional.of(new SessionTokens(1, 5, 9L, "refresh", WEEK)));
+        when(jwtService.generateToken(new AccessToken(1, 5, 9L))).thenReturn("access");
+        when(devices.remember(1, "device")).thenReturn(new DeviceCheck("device", false));
+
+        assertThat(authService.completeLogin("challenge", "123456", CLIENT, "device"))
+                .isEqualTo(new LoginResult(new TokenPair("access", "refresh", WEEK), "device", null));
+        verifyNoInteractions(notifier);
+    }
+
+    @Test
+    void aRecoveryCodeIsEmailedToTheOwner() {
+        when(challenges.parse("challenge")).thenReturn(Optional.of(new LoginChallenges.Challenge(1, 5)));
+        when(twoFactor.checkLogin(1, 5, "abcde-fghij")).thenReturn(Optional.of(TwoFactorService.Method.RECOVERY_CODE));
+        when(sessions.open(1, 5, CLIENT)).thenReturn(Optional.of(new SessionTokens(1, 5, 9L, "refresh", WEEK)));
+        when(devices.remember(1, null)).thenReturn(new DeviceCheck("device", false));
+
+        authService.completeLogin("challenge", "abcde-fghij", CLIENT, null);
+
+        verify(notifier).send(1, SecurityAlert.RECOVERY_CODE_USED, CLIENT);
+    }
+
+    @Test
+    void aWrongCodeIsLikeAWrongPassword() {
+        when(challenges.parse("challenge")).thenReturn(Optional.of(new LoginChallenges.Challenge(1, 5)));
+        when(twoFactor.checkLogin(1, 5, "000000")).thenThrow(new InvalidCodeException("wrong"));
+
+        assertThatThrownBy(() -> authService.completeLogin("challenge", "000000", CLIENT, null))
+                .isInstanceOf(BadCredentialsException.class);
+        verifyNoInteractions(sessions, devices);
+    }
+
+    @Test
+    void anExpiredChallengeOrAChangedAccountMeansLoggingInAgain() {
+        when(challenges.parse("expired")).thenReturn(Optional.empty());
+        when(challenges.parse("changed")).thenReturn(Optional.of(new LoginChallenges.Challenge(1, 5)));
+        when(twoFactor.checkLogin(1, 5, "123456")).thenReturn(Optional.empty());
+
+        for (String challenge : List.of("expired", "changed"))
+            assertThatThrownBy(() -> authService.completeLogin(challenge, "123456", CLIENT, null))
+                    .isInstanceOfSatisfying(TwoFactorStateException.class,
+                            e -> assertThat(e.getCode()).isEqualTo(ErrorCode.TWO_FACTOR_LOGIN_EXPIRED));
+        verifyNoInteractions(sessions);
     }
 
     @Test

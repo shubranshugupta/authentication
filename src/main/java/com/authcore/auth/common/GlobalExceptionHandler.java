@@ -30,6 +30,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.authcore.auth.mfa.TwoFactorStateException;
 import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.InvalidTokenException;
 import com.authcore.auth.security.TokenExpireException;
@@ -81,6 +82,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     ProblemDetail handle(WrongPasswordException e) {
         return problem(ErrorCode.WRONG_PASSWORD, e.getMessage());
+    }
+
+    @ExceptionHandler
+    ProblemDetail handle(TwoFactorStateException e) {
+        return problem(e.getCode(), e.getMessage());
     }
 
     @ExceptionHandler

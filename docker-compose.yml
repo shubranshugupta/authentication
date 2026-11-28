@@ -72,6 +72,7 @@ services:
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in env.properties}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?set TOTP_ENCRYPTION_KEY in env.properties}
       AUTH_ADMIN_EMAILS: ${AUTH_ADMIN_EMAILS:-}
     ports:
       - "127.0.0.1:8080:8080"   # the API
