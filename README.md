@@ -4,6 +4,7 @@ This project is a comprehensive authentication system built using Spring Boot. I
 
 ## Features
 
+- Password Hashing: Argon2id (OWASP's settings). Older bcrypt hashes still work and are replaced at the user's next login.
 - JWT Authentication: Short-lived access tokens (JWT, 15 minutes) that stop working at once after a logout, a password reset or a password change.
 - Sessions: One session per device, with refresh tokens that work once and are stored only as hashes. Users can list their sessions and log out of them.
 - Rate Limiting: Limits on wrong passwords, code guesses, registrations and emails.
@@ -317,7 +318,8 @@ While that link works, the email can't be changed again (`409 EMAIL_CHANGE_REFUS
 
 ### Input Rules
 
-- **Passwords** (registration, reset, change, and undoing an email change): at least 12 characters and at most 72 bytes. bcrypt ignores anything after 72 bytes; accented letters and emoji take 2–4 bytes each.
+- **Passwords** (registration, reset, change, and undoing an email change): at least 12 characters and at most 72 bytes; accented letters and emoji take 2–4 bytes each. The limit comes from bcrypt, which ignores anything after 72 bytes; new hashes are Argon2id, but passwords from before are still checked with bcrypt.
+- **Password hashes** are Argon2id (19 MiB of memory, 2 iterations, 1 lane: OWASP's minimum), stored as `{argon2}$argon2id$...`. Hashes from before have no prefix and are bcrypt; they still match, and are replaced with Argon2id at the user's next login with the right password (sessions stay). Each hash takes 19 MiB, so no more run at once than the server has processors; the others wait.
 - **Emails** are trimmed and lowercased, so `Jane@Example.com` and `jane@example.com` are the same account.
 - **Invalid input** returns `400` with an `errors` object that maps each field to its problem, for example `{"password": "must be at least 12 characters"}`.
 

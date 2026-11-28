@@ -32,7 +32,7 @@ class RegistrationAndLoginFlowTests extends IntegrationTest {
 
         User user = user(email);
         assertThat(user.isEnabled()).isFalse();
-        assertThat(user.getPassword()).isNotEqualTo(PASSWORD).startsWith("$2");
+        assertThat(user.getPassword()).isNotEqualTo(PASSWORD).startsWith("{argon2}$argon2id$");
 
         MimeMessage verificationEmail = awaitEmail(email, "Verify Email");
         assertThat(htmlBody(verificationEmail))
