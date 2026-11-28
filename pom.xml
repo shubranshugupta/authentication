@@ -112,10 +112,11 @@
 			<artifactId>jjwt-jackson</artifactId>
 			<version>${jjwt.version}</version>
 		</dependency>
-		<!-- <dependency>
+		<!-- Social login with Google (F5). Off unless GOOGLE_CLIENT_ID is set. -->
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-client</artifactId>
-		</dependency> -->
+		</dependency>
 
 		<!-- Tests -->
 		<dependency>

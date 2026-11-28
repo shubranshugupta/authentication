@@ -75,6 +75,18 @@ public class AuthController {
         return loggedIn(authService.completeLogin(request.challenge(), request.code(), ClientInfo.of(http), deviceId));
     }
 
+    /**
+     * After signing in with Google, the web app's {@code /login/google} page gets a
+     * one-minute {@code code} in the URL's fragment, and exchanges it here. The answer is a
+     * login's: the tokens, or a {@code challenge} for two-factor authentication.
+     */
+    @PostMapping("/oauth2/exchange")
+    public ResponseEntity<AuthResponse> completeSocialLogin(@Valid @RequestBody SocialLoginRequest request,
+            @CookieValue(name = DEVICE_COOKIE, required = false) @Nullable String deviceId, HttpServletRequest http) {
+        rateLimiter.acquire(RateLimit.SOCIAL_LOGIN_PER_IP.forIp(http.getRemoteAddr()));
+        return loggedIn(authService.completeSocialLogin(request.code(), ClientInfo.of(http), deviceId));
+    }
+
     private ResponseEntity<AuthResponse> loggedIn(LoginResult login) {
         if (login.challenge() != null)
             // No cookies yet: the device cookie comes with the session.

@@ -2,6 +2,7 @@ package com.authcore.auth.security;
 
 import java.util.List;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +23,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.authcore.auth.common.AuthConfigProperties;
+import com.authcore.auth.social.GoogleSignIn;
 
 import lombok.RequiredArgsConstructor;
 
@@ -40,6 +42,8 @@ public class SecurityConfig {
     private final AuthenticationProvider authenticationProvider;
     private final AuthConfigProperties authConfigProperties;
     private final DelegatedAuthenticationEntryPoint authEntryPoint;
+    /** Only when GOOGLE_CLIENT_ID is set. */
+    private final ObjectProvider<GoogleSignIn> googleSignIn;
 
     /**
      * Actuator answers on its own port only (management.server.port), which must not be
@@ -77,6 +81,10 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(handling -> handling.authenticationEntryPoint(authEntryPoint));
+        // Signing in with Google: under /api/v1/auth, so public like the other logins.
+        GoogleSignIn google = googleSignIn.getIfAvailable();
+        if (google != null)
+            google.configure(http);
 
         return http.build();
     }
