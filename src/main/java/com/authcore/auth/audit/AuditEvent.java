@@ -49,6 +49,13 @@ public enum AuditEvent {
      * ("reason": WRONG_PASSWORD or RATE_LIMITED).
      */
     PASSWORD_CONFIRMATION_FAILED,
+    /**
+     * SES reported a permanent bounce or a complaint ("reason"): the address isn't emailed
+     * any more. The user id if an account has it; the address itself is never logged.
+     */
+    EMAIL_SUPPRESSED,
+    /** The admin "by" took an address off the suppression list. */
+    EMAIL_SUPPRESSION_REMOVED,
     /** By the admin "by". */
     USER_LOCKED,
     /** By the admin "by". */
