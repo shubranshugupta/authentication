@@ -30,6 +30,8 @@ class ApiDocsTests extends IntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/v1/auth/email-change/undo'].post.security", empty()))
                 .andExpect(jsonPath("$.paths['/api/v1/auth/login/2fa'].post.security", empty()))
                 .andExpect(jsonPath("$.paths['/api/v1/auth/oauth2/exchange'].post.security", empty()))
+                .andExpect(jsonPath("$.paths['/api/v1/webhooks/ses'].post.security", empty()))
+                .andExpect(jsonPath("$.paths['/api/v1/admin/email-suppressions'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/users/me/2fa/setup'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/users/me/2fa/enable'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/admin/users/{id}/2fa/disable'].post").exists())
