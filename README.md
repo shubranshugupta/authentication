@@ -8,8 +8,9 @@ This project is a comprehensive authentication system built using Spring Boot. I
 - Sessions: One session per device, with refresh tokens that work once and are stored only as hashes. Users can list their sessions and log out of them.
 - Rate Limiting: Limits on wrong passwords, code guesses, registrations and emails.
 - Role-Based Access Control: Different roles for users to manage access to various parts of the application.
-- Emailed Codes and Links: Verify an email, reset a password or delete an account. They are stored only as hashes, work once, expire, and stop working after 5 wrong guesses.
-- Security Emails: The owner is told about a login from a new device, a password change or reset, and a copied refresh token, with when and from where.
+- Emailed Codes and Links: Verify an email, reset a password, change the email or delete an account. They are stored only as hashes, work once, expire, and stop working after 5 wrong guesses.
+- Change Email: The new address is confirmed with a code; the old one gets a link that changes it back for 7 days.
+- Security Emails: The owner is told about a login from a new device, a password change or reset, an email change, and a copied refresh token, with when and from where.
 - Operations: Health checks and Prometheus metrics on a separate port, JSON logs with a trace id per request, an audit log of security events, OpenAPI documentation, a Docker image, and CI.
 
 ## Technologies Used
@@ -129,7 +130,7 @@ Besides the usual JVM, HTTP and database pool metrics, the app counts:
 
 - Every log line of a request has its trace id. A `500` answer names it (`"traceId"`), so its details can be found in the log.
 - In `prod`, every line is a JSON object ([Elastic Common Schema](https://www.elastic.co/guide/en/ecs/current/index.html)), for a log collector such as CloudWatch, Loki or Elasticsearch.
-- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
+- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `EMAIL_CHANGED`, `EMAIL_CHANGE_UNDONE`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
 
 ### Cleanup
 
@@ -173,9 +174,9 @@ Packages under `com.authcore.auth` are grouped by feature:
 
 | Package | What's in it |
 |---|---|
-| `auth` | registration, login, email verification, password reset |
+| `auth` | registration, login, email verification, password reset, undoing an email change |
 | `user` | the user entity, roles, and the user repository |
-| `user.account` | a user's own account: profile, password change, account deletion (`/api/v1/users/me`) |
+| `user.account` | a user's own account: profile, password and email change, account deletion (`/api/v1/users/me`) |
 | `user.admin` | the admin API (`/api/v1/admin/users`), and the first admins from `AUTH_ADMIN_EMAILS` |
 | `token` | the codes and links sent by email |
 | `session` | sessions and refresh tokens, logout |
@@ -199,6 +200,7 @@ Packages under `com.authcore.auth` are grouped by feature:
 | `POST /api/v1/auth/logout` | (refresh cookie) | Ends the session and deletes the cookie |
 | `POST /api/v1/auth/password-reset` | `email` | Emails a reset code |
 | `POST /api/v1/auth/password-reset/confirm` | `email`, `otp`, `password` | Sets the new password, and ends every session |
+| `POST /api/v1/auth/email-change/undo` | `token`, `password` | From the link sent to the old address: changes the email back, sets the new password, and ends every session |
 
 ### The Logged-in User
 
@@ -209,6 +211,8 @@ These need the access token: `Authorization: Bearer <token>`.
 | `GET /api/v1/users/me` | | Returns the profile |
 | `PATCH /api/v1/users/me` | `firstName`, `lastName` (both optional) | Changes what is given. An empty `lastName` removes it |
 | `PUT /api/v1/users/me/password` | `currentPassword`, `newPassword` | Changes the password and logs out of all other devices. Returns a new `accessToken` for this device (the old one stops working); the refresh cookie stays the same |
+| `POST /api/v1/users/me/email` | `currentPassword`, `newEmail` | Emails a code to the new address. Nothing changes yet |
+| `POST /api/v1/users/me/email/confirm` | `otp` | Changes the email to the address the code was sent to. Every device stays logged in |
 | `GET /api/v1/users/me/sessions` | | Lists where the user is logged in |
 | `DELETE /api/v1/users/me/sessions/{id}` | | Logs that device out |
 | `DELETE /api/v1/users/me/sessions` | | Logs out of all devices, this one too |
@@ -223,6 +227,7 @@ These need the access token: `Authorization: Bearer <token>`.
 - Two tabs may refresh at the same moment with the same cookie: for 10 seconds, the replaced token still returns an access token (but no new cookie).
 - A password reset, "log out of all devices", and an admin locking the account end every session and make every access token stop working.
 - A password change ends every *other* session. Every access token stops working, so the answer has a new one for this session.
+- An email change keeps every session (access tokens name the user by id, not by email). Undoing one ends them all.
 - The endpoints under `/api/v1/auth` ignore the `Authorization` header, so an expired access token doesn't get in the way of refreshing it.
 
 ### Rate Limits
@@ -235,8 +240,10 @@ Beyond a limit, the answer is `429` with the code `TOO_MANY_REQUESTS` and a `Ret
 | Registrations | 20 per address in an hour |
 | Verification emails, password reset emails | 20 per address and 10 per account in an hour, each |
 | Deletion emails | 10 per user in an hour |
+| Email change codes | 10 per user in an hour |
 | Confirming a verification link | 30 per address in 15 minutes |
 | Confirming a password reset | 30 per address in 15 minutes; 10 per account from one address in an hour |
+| Undoing an email change | 30 per address in 15 minutes |
 
 - "Account" is the email in the request, registered or not, so the limits don't show which emails are registered. A successful login, password reset or password change clears the account's wrong passwords.
 - The counters are in Redis. While Redis is down, nothing is limited, and everything else keeps working. Emailed codes always allow only 5 guesses.
@@ -253,6 +260,7 @@ These tell the owner that something happened to their account, with the time (UT
 | Your AuthCore password was changed | `PUT /api/v1/users/me/password` |
 | Your AuthCore password was reset | A password reset with an emailed code |
 | You were logged out of AuthCore everywhere | A used refresh token showed up again, so every session ended |
+| Your AuthCore email was changed | The email was changed (sent to the old address, with the undo link; see below) |
 
 - **Devices** are told apart by the `deviceId` cookie (HttpOnly, path `/api/v1/auth`, 90 days), which every login sets. It stays after a logout. Only its hash is stored (`known_devices`).
 - The first login of an account created less than a day ago sends nothing: it's the owner, right after signing up.
@@ -265,6 +273,8 @@ These tell the owner that something happened to their account, with the time (UT
 | Verify Email | a link to `FRONTEND_URL/verify-email?token=...` | 24 hours |
 | Password Reset | an 8-digit code | 15 minutes |
 | Delete Account | an 8-digit code | 10 minutes |
+| Confirm your new AuthCore email | an 8-digit code, sent to the new address | 15 minutes |
+| Your AuthCore email was changed | a link to `FRONTEND_URL/undo-email-change?token=...`, sent to the old address | 7 days |
 
 - The link opens a page of your web app (`FRONTEND_URL`, `http://localhost:3000` in development). That page must send the `token` to `POST /api/v1/auth/email-verification/confirm`. Without a web app, copy the token from the email in Mailpit and send it yourself:
 
@@ -275,9 +285,17 @@ These tell the owner that something happened to their account, with the time (UT
 - A new code or link can be requested after 60 seconds, and replaces the old one. For the public endpoints, requests made sooner get the usual answer but send nothing; the deletion endpoint answers `409`.
 - After 5 wrong guesses a code stops working. Request a new one.
 
+### Changing the Email
+
+1. `POST /api/v1/users/me/email` with the current password and the new address. The new address gets a code. An address that another account has is refused (`409 USER_ALREADY_EXISTS`), like at registration.
+2. `POST /api/v1/users/me/email/confirm` with the code. The account now has the new address, every device stays logged in, and reset or deletion codes sent to the old address stop working.
+3. The old address gets a link that changes the email back for 7 days. Whoever knew the password could otherwise take the account, since reset codes now go to their address. The link's page (`FRONTEND_URL/undo-email-change`) must send the `token` and a new password to `POST /api/v1/auth/email-change/undo`, which changes the email back, sets the password and ends every session.
+
+While that link works, the email can't be changed again (`409 EMAIL_CHANGE_REFUSED`), and no other account can register or change to the old address. That also means that whoever can read the old inbox can take the account back during those 7 days.
+
 ### Input Rules
 
-- **Passwords** (registration, reset and change): at least 12 characters and at most 72 bytes. bcrypt ignores anything after 72 bytes; accented letters and emoji take 2–4 bytes each.
+- **Passwords** (registration, reset, change, and undoing an email change): at least 12 characters and at most 72 bytes. bcrypt ignores anything after 72 bytes; accented letters and emoji take 2–4 bytes each.
 - **Emails** are trimmed and lowercased, so `Jane@Example.com` and `jane@example.com` are the same account.
 - **Invalid input** returns `400` with an `errors` object that maps each field to its problem, for example `{"password": "must be at least 12 characters"}`.
 

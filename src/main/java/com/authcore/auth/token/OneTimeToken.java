@@ -62,14 +62,22 @@ public class OneTimeToken {
     @Column(name = "consumed_at")
     private @Nullable Instant consumedAt;
 
+    /**
+     * The address this is for, if not the account's: where it was sent, and what the account's
+     * email becomes once it's used (the new address, or the old one for an undo link).
+     */
+    @Column(name = "email")
+    private @Nullable String email;
+
     OneTimeToken(Integer userId, TokenPurpose purpose) {
         this.userId = userId;
         this.purpose = purpose;
     }
 
     /** Makes this the new, unused token. The old one stops working. */
-    void issue(String tokenHash, Instant now) {
+    void issue(String tokenHash, @Nullable String email, Instant now) {
         this.tokenHash = tokenHash;
+        this.email = email;
         this.attempts = 0;
         this.issuedAt = now;
         this.expiresAt = now.plus(purpose.validFor);

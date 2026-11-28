@@ -14,4 +14,13 @@ public final class EmailAddresses {
     public static String normalize(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
+
+    /**
+     * Enough of an address for its owner to recognize it, e.g. "j***@example.com", but not
+     * enough to write to it.
+     */
+    public static String mask(String email) {
+        int at = email.lastIndexOf('@');
+        return at < 1 ? "***" : email.charAt(0) + "***" + email.substring(at);
+    }
 }

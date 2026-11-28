@@ -17,6 +17,14 @@ public interface OneTimeTokenRepository extends JpaRepository<OneTimeToken, Long
     @Query("select t.userId from OneTimeToken t where t.tokenHash = :tokenHash and t.purpose = :purpose")
     Optional<Integer> findUserId(String tokenHash, TokenPurpose purpose);
 
+    @Query("select count(t) > 0 from OneTimeToken t where t.email = :email and t.purpose = :purpose"
+            + " and t.consumedAt is null and t.expiresAt > :now")
+    boolean existsUnused(String email, TokenPurpose purpose, Instant now);
+
+    @Modifying
+    @Query("delete from OneTimeToken t where t.userId = :userId and t.purpose in :purposes")
+    void deleteByUserIdAndPurposeIn(Integer userId, Collection<TokenPurpose> purposes);
+
     // ---- cleanup (TokenCleanup) ----
 
     @Query("select distinct t.userId from OneTimeToken t where t.expiresAt <= :now")

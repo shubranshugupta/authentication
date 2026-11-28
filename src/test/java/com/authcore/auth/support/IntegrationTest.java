@@ -247,6 +247,16 @@ public abstract class IntegrationTest {
         return find(CODE, htmlBody(awaitEmail(email, "Delete Account")));
     }
 
+    /** The code sent to the new address. */
+    protected String emailChangeOtp(String newEmail) throws Exception {
+        return find(CODE, htmlBody(awaitEmail(newEmail, "Confirm your new AuthCore email")));
+    }
+
+    /** The token in the latest undo link sent to the old address. */
+    protected String undoEmailChangeToken(String oldEmail) throws Exception {
+        return find(LINK_TOKEN, htmlBody(awaitEmail(oldEmail, "Your AuthCore email was changed")));
+    }
+
     private static String find(Pattern pattern, String html) {
         Matcher matcher = pattern.matcher(html);
         if (!matcher.find())
