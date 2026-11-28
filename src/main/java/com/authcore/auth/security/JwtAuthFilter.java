@@ -42,7 +42,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return SecurityConfig.PUBLIC.matches(request);
+        return SecurityConfig.PUBLIC.matches(request) || SecurityConfig.WEBHOOKS.matches(request);
     }
 
     @Override

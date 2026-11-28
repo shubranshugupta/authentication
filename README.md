@@ -83,7 +83,7 @@ NOTE: The application will start at `http://localhost:8080`. The API is describe
 | Profile | How it's selected | Settings come from |
 |---|---|---|
 | `dev` | the default | environment variables, then `./env.properties`, then defaults matching `docker-compose.yml`. SQL logging is on. |
-| `prod` | `SPRING_PROFILES_ACTIVE=prod` (the Docker image's default) | environment variables only. There are no defaults for hosts or credentials: `DB_HOST`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `TOTP_ENCRYPTION_KEY`, `MAIL_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` and `FRONTEND_URL` must be set; if one is missing, the app doesn't start and names all the missing ones. Logs are JSON, and the API docs are off. |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod` (the Docker image's default) | environment variables only. There are no defaults for hosts or credentials: `DB_HOST`, `DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`, `JWT_SECRET_KEY`, `TOTP_ENCRYPTION_KEY`, `MAIL_FROM` and `FRONTEND_URL` must be set, and `MAIL_HOST`, `MAIL_USERNAME` and `MAIL_PASSWORD` unless `MAIL_TRANSPORT=ses` (then `AWS_REGION`); if one is missing, the app doesn't start and names all the missing ones. Logs are JSON, and the API docs are off. |
 
 ### Database Migrations
 
@@ -137,7 +137,7 @@ Besides the usual JVM, HTTP and database pool metrics, the app counts:
 
 - Every log line of a request has its trace id. A `500` answer names it (`"traceId"`), so its details can be found in the log.
 - In `prod`, every line is a JSON object ([Elastic Common Schema](https://www.elastic.co/guide/en/ecs/current/index.html)), for a log collector such as CloudWatch, Loki or Elasticsearch.
-- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `EMAIL_CHANGED`, `EMAIL_CHANGE_UNDONE`, `SECOND_FACTOR_REQUIRED`, `TWO_FACTOR_ENABLED`, `TWO_FACTOR_DISABLED`, `RECOVERY_CODES_RENEWED`, `GOOGLE_SIGN_UP`, `GOOGLE_LINKED`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
+- **The audit log** is the logger `AUDIT`: one line per security event, with the user's id and address, never emails, passwords or tokens. For example `LOGIN_FAILED userId=12 ip=203.0.113.7 reason=WRONG_PASSWORD`. The events are `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `SESSION_ENDED`, `ALL_SESSIONS_ENDED`, `REFRESH_TOKEN_REUSED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `EMAIL_CHANGED`, `EMAIL_CHANGE_UNDONE`, `SECOND_FACTOR_REQUIRED`, `TWO_FACTOR_ENABLED`, `TWO_FACTOR_DISABLED`, `RECOVERY_CODES_RENEWED`, `GOOGLE_SIGN_UP`, `GOOGLE_LINKED`, `EMAIL_SUPPRESSED`, `EMAIL_SUPPRESSION_REMOVED`, `ACCOUNT_DELETED`, `PASSWORD_CONFIRMATION_FAILED`, `USER_LOCKED`, `USER_UNLOCKED`, `USER_LOGGED_OUT` and `ROLE_CHANGED`.
 
 ### Cleanup
 
@@ -152,24 +152,47 @@ Every hour (`CLEANUP_CRON`, default `0 7 * * * *`), a job deletes expired sessio
 
 ### Sending Email with Amazon SES
 
-The app sends over SMTP, so switching to [Amazon SES](https://aws.amazon.com/ses/) needs settings, not code:
+[Amazon SES](https://aws.amazon.com/ses/) can take the emails over SMTP or through its HTTP API.
 
-1. In the AWS console, open SES in a region near your users (for example `ap-south-1`).
+First, in the AWS console:
+
+1. Open SES in a region near your users (for example `ap-south-1`).
 2. **Verify a sender:** an email address to start with, or your own domain.
 3. New accounts are in the **sandbox**: they can only send to verified addresses, at a low rate. Verify your own inbox as a recipient to test. To email any user, request production access in the SES console.
-4. Create **SMTP credentials** (SES → SMTP settings). They are not your AWS access keys.
-5. Set:
-   ```properties
-   MAIL_HOST=email-smtp.<region>.amazonaws.com
-   MAIL_PORT=587
-   MAIL_USERNAME=<SES SMTP username>
-   MAIL_PASSWORD=<SES SMTP password>
-   MAIL_FROM=<the verified address, or one at the verified domain>
-   FRONTEND_URL=<the web app's public URL: the links in the emails open it>
-   ```
-6. With your own domain, add the DNS records SES shows (**DKIM**), plus **SPF** and **DMARC**, so that the emails don't land in spam.
+4. With your own domain, add the DNS records SES shows (**DKIM**), plus **SPF** and **DMARC**, so that the emails don't land in spam.
+
+**Through the API (recommended):** over HTTPS, so no SMTP port has to be open, and with a configuration set if you give one.
+
+```properties
+MAIL_TRANSPORT=ses
+AWS_REGION=<the SES region>
+MAIL_FROM=<the verified address, or one at the verified domain>
+SES_CONFIGURATION_SET=<optional: e.g. one that reports bounces, see below>
+```
+
+The AWS credentials are the environment's: an IAM role on AWS (ECS task role, EC2 instance profile), or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. They need `ses:SendEmail` and `ses:SendRawEmail`. With `MAIL_TRANSPORT=ses`, the `MAIL_HOST`, `MAIL_USERNAME` and `MAIL_PASSWORD` settings aren't needed.
+
+**Over SMTP:** create **SMTP credentials** (SES → SMTP settings; they are not your AWS access keys), and set:
+
+```properties
+MAIL_HOST=email-smtp.<region>.amazonaws.com
+MAIL_PORT=587
+MAIL_USERNAME=<SES SMTP username>
+MAIL_PASSWORD=<SES SMTP password>
+MAIL_FROM=<the verified address, or one at the verified domain>
+```
 
 The rate limits and the one-minute wait between codes keep the app within SES's sending quota. `authcore_emails_total{outcome="failed"}` shows emails SES refused.
+
+#### Bounces and complaints
+
+An address that bounces for good (it doesn't exist) or whose owner marks an email as spam shouldn't be emailed again: SES pauses senders that keep doing it. The app keeps a **suppression list** and skips those addresses (`authcore_emails_total{outcome="suppressed"}`):
+
+1. Create an SNS topic, and in SES a **configuration set** with an event destination for **bounces and complaints** to that topic. Set `SES_CONFIGURATION_SET` to its name.
+2. Subscribe `https://<api host>/api/v1/webhooks/ses` to the topic (protocol HTTPS), and set `SES_SNS_TOPIC_ARN` to the topic's ARN. The app confirms the subscription itself.
+3. Only messages SNS signed (checked against SNS's certificate) from that topic are taken. A permanent bounce or a complaint puts the address on the list; a temporary bounce (a full mailbox) doesn't.
+
+This works with either way of sending. Admins see the list with `GET /api/v1/admin/email-suppressions` and take an address off with `POST /api/v1/admin/email-suppressions/remove` (`{"email": "...", "password": "<the admin's own>"}`). Without `SES_SNS_TOPIC_ARN`, the endpoint answers 404.
 
 ### Continuous Integration
 
@@ -191,7 +214,7 @@ Packages under `com.authcore.auth` are grouped by feature:
 | `mfa` | two-factor authentication: TOTP, recovery codes, the login's second step |
 | `social` | signing in with Google |
 | `ratelimit` | limits on logins, code guesses and emails |
-| `notification` | emails |
+| `notification` | emails: SMTP or the SES API, security alerts, the suppression list and SES's notifications |
 | `audit` | the audit log |
 | `common` | settings, error handling, validation, cleanup, API docs |
 

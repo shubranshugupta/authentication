@@ -58,8 +58,24 @@ class RequiredSettingsTests {
 
         assertThat(Binder.get(environment).bind(RequiredSettings.LIST, Bindable.listOf(String.class)).get())
                 .containsExactlyInAnyOrder("DB_HOST", "DB_DATABASE", "DB_USER", "DB_PASSWORD",
-                        "REDIS_HOST", "REDIS_PASSWORD", "MAIL_HOST", "MAIL_USERNAME", "MAIL_PASSWORD",
-                        "MAIL_FROM", "JWT_SECRET_KEY", "TOTP_ENCRYPTION_KEY", "FRONTEND_URL");
+                        "REDIS_HOST", "REDIS_PASSWORD", "MAIL_FROM", "JWT_SECRET_KEY", "TOTP_ENCRYPTION_KEY",
+                        "FRONTEND_URL");
+        assertThat(Binder.get(environment).bind(RequiredSettings.SMTP_LIST, Bindable.listOf(String.class)).get())
+                .containsExactlyInAnyOrder("MAIL_HOST", "MAIL_USERNAME", "MAIL_PASSWORD");
+    }
+
+    /** M7e: sending through the SES API needs no SMTP server. */
+    @Test
+    void theSmtpSettingsAreNeededOnlyForSmtp() {
+        MockEnvironment smtp = new MockEnvironment()
+                .withProperty(RequiredSettings.LIST, "MAIL_FROM")
+                .withProperty(RequiredSettings.SMTP_LIST, "MAIL_HOST, MAIL_PASSWORD")
+                .withProperty("MAIL_FROM", "noreply@example.com");
+        assertThatThrownBy(() -> check(smtp)).hasMessage("Missing settings: MAIL_HOST, MAIL_PASSWORD");
+
+        assertThatNoException().isThrownBy(() -> check(smtp.withProperty("auth.mail.transport", "ses")));
+        assertThatThrownBy(() -> check(smtp.withProperty("auth.mail.transport", " SMTP ")))
+                .isInstanceOf(MissingSettingsException.class);
     }
 
     /** Registered in spring.factories: it runs before anything connects anywhere. */

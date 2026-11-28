@@ -48,12 +48,19 @@ public class EmailListener {
     private final JavaMailSender mailSender;
     private final AuthConfigProperties authConfigProperties;
     private final MeterRegistry meters;
+    private final SuppressionList suppressionList;
 
     // fallbackExecution: without a transaction, send it now. By default it would be ignored.
     @Async(EmailConfig.EMAIL_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void on(EmailRequested email) {
         try {
+            // It bounced for good, or its owner complained (M7e): don't make it worse.
+            if (suppressionList.isSuppressed(email.to())) {
+                log.info("Email {} not sent: the address is on the suppression list", email.template());
+                count(email, "suppressed");
+                return;
+            }
             MimeMessage message = message(email);
             RETRY.execute(() -> {
                 mailSender.send(message);

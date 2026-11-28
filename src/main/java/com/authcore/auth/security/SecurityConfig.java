@@ -34,6 +34,8 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
     /** Everything else needs a login. */
     static final RequestMatcher PUBLIC = PathPatternRequestMatcher.pathPattern("/api/v1/auth/**");
+    /** From other services (SNS), which prove who they are by a signature, not a login. */
+    static final RequestMatcher WEBHOOKS = PathPatternRequestMatcher.pathPattern("/api/v1/webhooks/**");
 
     /** The API description and Swagger UI (F3); prod turns them off by default. */
     private static final String[] API_DOCS = { "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html" };
@@ -68,7 +70,7 @@ public class SecurityConfig {
                 // rejected as unauthenticated.
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers(PUBLIC)
+                        .requestMatchers(PUBLIC, WEBHOOKS)
                         .permitAll()
                         .requestMatchers(EndpointRequest.toAnyEndpoint())
                         .permitAll()

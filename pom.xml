@@ -17,9 +17,21 @@
 	<properties>
 		<java.version>21</java.version>
 		<jjwt.version>0.13.0</jjwt.version>
+		<aws-sdk.version>2.59.10</aws-sdk.version>
 		<!-- 3.1.x is the line for Spring Boot 4.1 -->
 		<springdoc.version>3.2.1</springdoc.version>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${aws-sdk.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -111,6 +123,26 @@
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-jackson</artifactId>
 			<version>${jjwt.version}</version>
+		</dependency>
+		<!-- Sending through the SES v2 API (MAIL_TRANSPORT=ses). The JDK's HTTP client is
+		     enough: the Apache and Netty ones would only add size. -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>sesv2</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>software.amazon.awssdk</groupId>
+					<artifactId>apache-client</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>software.amazon.awssdk</groupId>
+					<artifactId>netty-nio-client</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>url-connection-client</artifactId>
 		</dependency>
 		<!-- Argon2id password hashes (Spring Security's Argon2PasswordEncoder needs it). -->
 		<dependency>

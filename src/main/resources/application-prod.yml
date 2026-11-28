@@ -58,5 +58,7 @@ auth:
     required-settings: >-
         DB_HOST, DB_DATABASE, DB_USER, DB_PASSWORD,
         REDIS_HOST, REDIS_PASSWORD,
-        MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM,
+        MAIL_FROM,
         JWT_SECRET_KEY, TOTP_ENCRYPTION_KEY, FRONTEND_URL
+    # Only while MAIL_TRANSPORT is smtp (the default); with ses, AWS_REGION is checked instead.
+    required-smtp-settings: MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD
