@@ -16,6 +16,8 @@ import com.authcore.auth.audit.AuditLog;
 import com.authcore.auth.common.AuthConfigProperties;
 import com.authcore.auth.common.EmailAddresses;
 import com.authcore.auth.common.RetryingTransaction;
+import com.authcore.auth.notification.SecurityAlert;
+import com.authcore.auth.notification.SecurityNotifier;
 import com.authcore.auth.ratelimit.LoginThrottle;
 import com.authcore.auth.ratelimit.TooManyRequestsException;
 import com.authcore.auth.security.AccessToken;
@@ -25,6 +27,8 @@ import com.authcore.auth.security.LoginDetails;
 import com.authcore.auth.security.PasswordConfirmation;
 import com.authcore.auth.security.Reauthentication;
 import com.authcore.auth.session.ClientInfo;
+import com.authcore.auth.session.DeviceService;
+import com.authcore.auth.session.DeviceService.DeviceCheck;
 import com.authcore.auth.session.SessionService;
 import com.authcore.auth.session.SessionTokens;
 import com.authcore.auth.token.InvalidCodeException;
@@ -57,6 +61,8 @@ public class AuthService {
     private final AuthConfigProperties authConfigProperties;
     private final AuditLog audit;
     private final Reauthentication reauthentication;
+    private final DeviceService devices;
+    private final SecurityNotifier notifier;
 
     public void register(RegisterRequest request) {
         String email = EmailAddresses.normalize(request.getEmail());
@@ -87,7 +93,11 @@ public class AuthService {
         }
     }
 
-    public TokenPair login(String email, String password, ClientInfo client) {
+    /**
+     * @param deviceId the client's device id (a cookie), null if it has none
+     * @return the tokens, and the device id the client keeps from now on
+     */
+    public LoginResult login(String email, String password, ClientInfo client, @Nullable String deviceId) {
         String normalized = EmailAddresses.normalize(email);
         try {
             loginThrottle.beforeCheck(normalized, client.ip());
@@ -104,8 +114,12 @@ public class AuthService {
                     loginFailed(normalized, "ACCOUNT_CHANGED");
                     return new BadCredentialsException("Bad credentials");
                 });
-        audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId());
-        return tokenPair(session);
+        DeviceCheck device = devices.remember(session.userId(), deviceId);
+        audit.record(AuditEvent.LOGIN_SUCCEEDED, session.userId(), "sessionId", session.sessionId(),
+                "newDevice", device.isNew());
+        if (device.isNew())
+            notifier.send(session.userId(), SecurityAlert.NEW_DEVICE_LOGIN, client);
+        return new LoginResult(tokenPair(session), device.deviceId());
     }
 
     private LoginDetails checkPassword(String email, String password, ClientInfo client) {
@@ -177,7 +191,7 @@ public class AuthService {
                 .ifPresent(user -> tokens.issue(user.getId(), TokenPurpose.PASSWORD_RESET));
     }
 
-    public void resetPassword(String email, String code, String newPassword, String ip) {
+    public void resetPassword(String email, String code, String newPassword, ClientInfo client) {
         String normalized = EmailAddresses.normalize(email);
         User account = userRepository.findByEmail(normalized)
                 .filter(AuthService::canResetPassword)
@@ -194,8 +208,9 @@ public class AuthService {
                 }).orElse(false));
         if (!reset)
             throw new InvalidCodeException(INVALID_CODE);
-        loginThrottle.passwordChanged(normalized, ip);
+        loginThrottle.passwordChanged(normalized, client.ip());
         audit.record(AuditEvent.PASSWORD_RESET, account.getId());
+        notifier.send(account.getId(), SecurityAlert.PASSWORD_RESET, client);
     }
 
     /**
@@ -209,8 +224,8 @@ public class AuthService {
      * @throws InvalidTokenException if this session ended, or the password changed, meanwhile
      */
     public String changePassword(Integer userId, Long sessionId, String currentPassword, String newPassword,
-            String ip) {
-        User checked = reauthentication.check(new PasswordConfirmation(userId, currentPassword, ip));
+            ClientInfo client) {
+        User checked = reauthentication.check(new PasswordConfirmation(userId, currentPassword, client.ip()));
         String passwordHash = passwordEncoder.encode(newPassword);
 
         SessionTokens session = transaction.run(() -> {
@@ -223,8 +238,9 @@ public class AuthService {
             return sessions.endAllExcept(user, sessionId)
                     .orElseThrow(() -> new InvalidTokenException(JwtService.INVALID_TOKEN));
         });
-        loginThrottle.passwordChanged(checked.getEmail(), ip);
+        loginThrottle.passwordChanged(checked.getEmail(), client.ip());
         audit.record(AuditEvent.PASSWORD_CHANGED, userId, "sessionId", sessionId);
+        notifier.send(userId, SecurityAlert.PASSWORD_CHANGED, client);
         return tokenPair(session).accessToken();
     }
 

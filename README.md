@@ -9,7 +9,7 @@ This project is a comprehensive authentication system built using Spring Boot. I
 - Rate Limiting: Limits on wrong passwords, code guesses, registrations and emails.
 - Role-Based Access Control: Different roles for users to manage access to various parts of the application.
 - Emailed Codes and Links: Verify an email, reset a password or delete an account. They are stored only as hashes, work once, expire, and stop working after 5 wrong guesses.
-- Email Notifications: Sends emails for new user registrations, password resets, and other significant events.
+- Security Emails: The owner is told about a login from a new device, a password change or reset, and a copied refresh token, with when and from where.
 - Operations: Health checks and Prometheus metrics on a separate port, JSON logs with a trace id per request, an audit log of security events, OpenAPI documentation, a Docker image, and CI.
 
 ## Technologies Used
@@ -133,7 +133,7 @@ Besides the usual JVM, HTTP and database pool metrics, the app counts:
 
 ### Cleanup
 
-Every hour (`CLEANUP_CRON`, default `0 7 * * * *`), a job deletes expired sessions, used refresh tokens older than 7 days, and expired codes and links. Several servers can run it at once.
+Every hour (`CLEANUP_CRON`, default `0 7 * * * *`), a job deletes expired sessions, used refresh tokens older than 7 days, expired codes and links, and devices not seen for 90 days. Several servers can run it at once.
 
 ### Other Settings
 
@@ -242,6 +242,21 @@ Beyond a limit, the answer is `429` with the code `TOO_MANY_REQUESTS` and a `Ret
 - The counters are in Redis. While Redis is down, nothing is limited, and everything else keeps working. Emailed codes always allow only 5 guesses.
 - **Behind a reverse proxy, set `FORWARD_HEADERS_STRATEGY=native`**, or all users share the limits of the proxy's address. Without a proxy keep the default (`none`), or clients could make up their address.
 - Locked out while testing? `docker compose exec redis redis-cli flushdb` clears the counters.
+
+### Security Emails
+
+These tell the owner that something happened to their account, with the time (UTC), the address and the device (its User-Agent). They can't be turned off.
+
+| Subject | When |
+|---|---|
+| New sign-in to your AuthCore account | A login from a device the account hasn't used in the last 90 days |
+| Your AuthCore password was changed | `PUT /api/v1/users/me/password` |
+| Your AuthCore password was reset | A password reset with an emailed code |
+| You were logged out of AuthCore everywhere | A used refresh token showed up again, so every session ended |
+
+- **Devices** are told apart by the `deviceId` cookie (HttpOnly, path `/api/v1/auth`, 90 days), which every login sets. It stays after a logout. Only its hash is stored (`known_devices`).
+- The first login of an account created less than a day ago sends nothing: it's the owner, right after signing up.
+- A client that doesn't keep cookies (e.g. a script or a mobile app without a cookie store) counts as a new device at every login. Apps should keep the `deviceId` cookie like a browser does.
 
 ### Codes and Links
 

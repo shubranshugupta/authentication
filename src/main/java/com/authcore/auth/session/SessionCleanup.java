@@ -12,9 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Deletes expired sessions (with their refresh tokens), and used refresh tokens that no
- * browser can still have (M5). A login deletes its user's expired sessions too; this
- * catches the users who don't come back.
+ * Deletes expired sessions (with their refresh tokens), used refresh tokens that no
+ * browser can still have (M5), and devices not seen for 90 days (F5). A login deletes its
+ * user's expired sessions too; this catches the users who don't come back.
  */
 @Slf4j
 @Component
@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SessionCleanup {
     private final UserSessionRepository sessionRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final KnownDeviceRepository deviceRepository;
     private final LockedCleanup cleanup;
     private final AuthConfigProperties properties;
 
@@ -37,7 +38,13 @@ public class SessionCleanup {
         int tokens = cleanup.run(
                 page -> refreshTokenRepository.findUsersWithTokensUsedBefore(usedBefore, page),
                 users -> refreshTokenRepository.deleteUsedBefore(users, usedBefore));
-        if (sessions + tokens > 0)
-            log.info("Deleted {} expired sessions and {} old used refresh tokens", sessions, tokens);
+        // A login from one of these would count as new anyway.
+        Instant unseenSince = now.minus(DeviceService.REMEMBERED_FOR);
+        int devices = cleanup.run(
+                page -> deviceRepository.findUsersWithDevicesUnseenSince(unseenSince, page),
+                users -> deviceRepository.deleteUnseenSince(users, unseenSince));
+        if (sessions + tokens + devices > 0)
+            log.info("Deleted {} expired sessions, {} old used refresh tokens and {} forgotten devices",
+                    sessions, tokens, devices);
     }
 }
