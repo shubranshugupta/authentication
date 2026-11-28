@@ -1,5 +1,6 @@
 package com.authcore.auth.common;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.boot.EnvironmentPostProcessor;
@@ -22,11 +23,16 @@ import org.springframework.core.env.ConfigurableEnvironment;
  */
 public class RequiredSettings implements EnvironmentPostProcessor, Ordered {
     static final String LIST = "auth.required-settings";
+    /** Needed only while emails go over SMTP, not with MAIL_TRANSPORT=ses. */
+    static final String SMTP_LIST = "auth.required-smtp-settings";
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-        List<String> missing = Binder.get(environment).bind(LIST, Bindable.listOf(String.class))
-                .orElse(List.of()).stream()
+        Binder binder = Binder.get(environment);
+        List<String> required = new ArrayList<>(binder.bind(LIST, Bindable.listOf(String.class)).orElse(List.of()));
+        if (!"ses".equalsIgnoreCase(environment.getProperty("auth.mail.transport", "smtp").strip()))
+            required.addAll(binder.bind(SMTP_LIST, Bindable.listOf(String.class)).orElse(List.of()));
+        List<String> missing = required.stream()
                 .map(String::strip)
                 .filter(name -> !name.isEmpty())
                 .filter(name -> {

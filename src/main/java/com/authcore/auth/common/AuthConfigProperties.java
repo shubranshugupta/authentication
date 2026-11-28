@@ -215,5 +215,46 @@ public class AuthConfigProperties {
 
         @NotBlank
         private String fromName;
+
+        /** SMTP (spring.mail.*: Mailpit, or SES's SMTP endpoint), or the SES v2 API. */
+        private Transport transport = Transport.SMTP;
+
+        @Valid
+        private SesConfigProperties ses = new SesConfigProperties();
+
+        public enum Transport {
+            SMTP, SES
+        }
+
+        @AssertTrue(message = "auth.mail.ses.region (AWS_REGION) is needed with MAIL_TRANSPORT=ses")
+        public boolean isSesRegionGiven() {
+            return transport != Transport.SES || StringUtils.hasText(ses.getRegion());
+        }
+    }
+
+    /**
+     * Amazon SES: sending through its API, and its bounce and complaint notifications
+     * (through SNS) for the suppression list.
+     */
+    @Data
+    @NoArgsConstructor
+    public static class SesConfigProperties {
+        private String region;
+
+        /** Another endpoint than AWS's, e.g. LocalStack's. Empty for AWS itself. */
+        private String endpoint;
+
+        /** The configuration set to send with, e.g. one that publishes bounces to SNS. Optional. */
+        private String configurationSet;
+
+        /**
+         * The SNS topic SES reports bounces and complaints to. Notifications from any other
+         * topic are refused. Without it, the endpoint for them is off.
+         */
+        private String topicArn;
+
+        /** Where SNS's signing certificates may come from; anything else is refused. */
+        @NotBlank
+        private String snsCertificateUrlPattern = "https://sns\\.[a-z0-9-]+\\.amazonaws\\.com(\\.cn)?/[^?#]+\\.pem";
     }
 }
