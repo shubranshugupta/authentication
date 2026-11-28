@@ -156,6 +156,24 @@ class AuditLogTests extends IntegrationTest {
         assertThat(auditLines(output)).noneMatch(line -> line.contains(email) || line.contains(NEW_PASSWORD));
     }
 
+    @Test
+    void passwordChangesAndWrongCurrentPasswordsAreRecorded(CapturedOutput output) throws Exception {
+        String email = uniqueEmail();
+        String accessToken = registerVerifiedUserAndLogin(email);
+        int userId = user(email).getId();
+        long sessionId = claims(accessToken).get("sid", Long.class);
+
+        mvc.perform(as(accessToken, put("/api/v1/users/me/password")).contentType(MediaType.APPLICATION_JSON)
+                .content(changePassword(WRONG, NEW_PASSWORD))).andExpect(status().isForbidden());
+        mvc.perform(as(accessToken, put("/api/v1/users/me/password")).contentType(MediaType.APPLICATION_JSON)
+                .content(changePassword(PASSWORD, NEW_PASSWORD))).andExpect(status().isOk());
+
+        auditLine(output, "PASSWORD_CONFIRMATION_FAILED", userId, "reason=WRONG_PASSWORD");
+        auditLine(output, "PASSWORD_CHANGED", userId, "sessionId=" + sessionId);
+        assertThat(auditLines(output)).noneMatch(line -> line.contains(email) || line.contains(NEW_PASSWORD)
+                || line.contains(PASSWORD) || line.contains(WRONG));
+    }
+
     // ---- admins --------------------------------------------------------------------
 
     @Test
@@ -211,6 +229,10 @@ class AuditLogTests extends IntegrationTest {
     private static MockHttpServletRequestBuilder loginRequest(String email, String password) {
         return post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\": \"%s\", \"password\": \"%s\"}".formatted(email, password));
+    }
+
+    private static String changePassword(String current, String newPassword) {
+        return "{\"currentPassword\": \"%s\", \"newPassword\": \"%s\"}".formatted(current, newPassword);
     }
 
     private static String password(String password) {
